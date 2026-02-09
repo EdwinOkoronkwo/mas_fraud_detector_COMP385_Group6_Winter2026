@@ -1,0 +1,126 @@
+%%{init: {'theme':'default', 'themeVariables': { 'background': '#ffffff'}}}%%
+
+classDiagram
+direction TB
+
+%% =====================
+%% CLIENT / UI LAYER
+%% =====================
+class StreamlitDashboard {
+    +render_ui()
+    +handle_user_query()
+}
+
+class IPipeline {
+    <<interface>>
+    +run_pipeline()
+}
+
+class FraudPipeline {
+    +run_pipeline()
+}
+
+StreamlitDashboard --> IPipeline
+IPipeline <|.. FraudPipeline
+
+%% =====================
+%% DATA PREPROCESSING TIER (NEW)
+%% =====================
+class IDataAgent {
+    <<interface>>
+    +run()
+}
+
+class SQL_Ingestor_Agent {
+    +run() : "CSV to SQLite"
+}
+
+class EDA_Agent {
+    +run() : "Analyze Imbalance/Stats"
+}
+
+class Cleaner_Agent {
+    +run() : "Scale & Clean via Tools"
+}
+
+FraudPipeline --> IDataAgent
+IDataAgent <|.. SQL_Ingestor_Agent
+IDataAgent <|.. EDA_Agent
+IDataAgent <|.. Cleaner_Agent
+
+%% Cleaner Agent uses existing tools
+class InternalTools {
+    <<Namespace: tools.data_prep>>
+}
+Cleaner_Agent ..> InternalTools : "calls cleaner.py"
+
+%% =====================
+%% CORE MANAGERS
+%% =====================
+class Planner {
+    +delegate_tasks()
+}
+class IPlanningStrategy {
+    <<interface>>
+    +generate_plan()
+}
+Planner o-- IPlanningStrategy
+IPlanningStrategy <|.. SequentialPlanner
+IPlanningStrategy <|.. ParallelPlanner
+
+class Critic {
+    +review_output()
+}
+class ICriticStrategy {
+    <<interface>>
+    +evaluate()
+}
+Critic o-- ICriticStrategy
+ICriticStrategy <|.. MetricCritic
+ICriticStrategy <|.. RAG_Critic
+
+FraudPipeline --> Planner
+FraudPipeline --> Critic
+
+%% =====================
+%% RAG & SEARCH AGENTS
+%% =====================
+class RAG_Agent {
+    +search_context()
+    +generate_answer()
+}
+class WebSearchAgent { +scrape() }
+class DBSearchAgent { +query() }
+
+RAG_Agent --> WebSearchAgent
+RAG_Agent --> DBSearchAgent
+FraudPipeline --> RAG_Agent
+
+%% =====================
+%% ML STRATEGIES (Supervised & Anomaly)
+%% =====================
+class ISupervisedAgent { <<interface>> +run() }
+class IAnomalyAgent { <<interface>> +run() }
+
+Planner --> ISupervisedAgent
+Planner --> IAnomalyAgent
+
+ISupervisedAgent <|.. RF_Agent
+ISupervisedAgent <|.. XGB_Agent
+ISupervisedAgent <|.. ANN_Agent
+ISupervisedAgent <|.. LR_Agent
+
+class IClustering { <<interface>> +cluster_and_flag() }
+class INeuroPattern { <<interface>> +reconstruct_and_flag() }
+
+IAnomalyAgent <|-- IClustering
+IAnomalyAgent <|-- INeuroPattern
+
+IClustering <|.. DBSCAN_Agent
+IClustering <|.. SOM_Agent
+IClustering <|.. KMeans_Agent
+IClustering <|.. IForest_Agent
+
+INeuroPattern <|.. AE_Standard_Agent
+INeuroPattern <|.. VAE_Agent
+INeuroPattern <|.. RNN_AE_Agent

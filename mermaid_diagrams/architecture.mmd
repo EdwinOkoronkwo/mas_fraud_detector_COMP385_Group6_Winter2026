@@ -1,0 +1,51 @@
+%%{init: {'theme':'default', 'themeVariables': { 'background': '#ffffff'}}}%%
+
+graph TD
+    %% UI Layer
+    subgraph UI [Client Interface]
+        User((User)) --> SD[Streamlit Dashboard]
+    end
+
+    %% Pipeline Orchestrator
+    subgraph Orchestration [Core Pipeline Orchestrator]
+        SD --> FP[Fraud Pipeline]
+        FP --> PL[Planner: Logic Delegation]
+        FP --> CT[Critic: Quality Gate]
+    end
+
+    %% Data Ingestion & Prep
+    subgraph DataTier [Data Preprocessing Tier]
+        FP --> IA[Data Agents]
+        IA --> S1[SQL Ingestor]
+        IA --> S2[EDA Analyst]
+        IA --> S3[Cleaner & Scaler]
+    end
+
+    %% Planning Strategies
+    subgraph Strategies [Planning & Reasoning]
+        PL --> P1[Sequential Execution]
+        PL --> P2[Parallel Execution]
+    end
+
+    %% RAG & Intelligence
+    subgraph Knowledge [RAG & Search Tier]
+        FP --> RA[RAG Agent]
+        RA --> WS[Web Search: Fraud Trends]
+        RA --> DB[Vector DB: Pattern Retrieval]
+    end
+
+    %% ML Models
+    subgraph ML [Machine Learning Ensemble]
+        PL --> SUP[Supervised Models: RF, XGB, ANN, LR]
+        PL --> ANO[Anomaly Models: SOM, IForest, RNN-AE, VAE]
+    end
+
+    %% Final Output
+    CT --> REP[Consolidated Fraud Report]
+
+    %% Styling
+    style UI fill:#eceff1,stroke:#455a64
+    style Orchestration fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    style DataTier fill:#f9f9f9,stroke:#333
+    style Knowledge fill:#fff3e0,stroke:#ef6c00
+    style ML fill:#f3e5f5,stroke:#7b1fa2

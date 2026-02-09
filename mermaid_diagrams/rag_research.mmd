@@ -1,0 +1,50 @@
+%%{init: {'theme':'default', 'themeVariables': { 'background': '#ffffff'}}}%%
+
+classDiagram
+direction TB
+
+    class RAG_Agent {
+        +investigate(alert_data)
+        +final_approval()
+    }
+
+    class SQL_Researcher {
+        +query_kaggle_stats()
+        <<Tool: SQLAlchemy>>
+    }
+
+    class Vector_Researcher {
+        +fetch_policy_guidelines()
+        <<Tool: ChromaDB>>
+    }
+
+    class Web_Researcher {
+        +get_live_threat_intel()
+        <<Tool: LangChain>>
+    }
+
+    class Synthesis_Engine {
+        +generate_explanation()
+        <<LLM: Mistral-Large>>
+    }
+
+    class RAG_Critic {
+        +validate_grounding()
+        +check_hallucination()
+    }
+
+    %% Information Retrieval
+    RAG_Agent --> SQL_Researcher
+    RAG_Agent --> Vector_Researcher
+    RAG_Agent --> Web_Researcher
+
+    SQL_Researcher ..> Synthesis_Engine
+    Vector_Researcher ..> Synthesis_Engine
+    Web_Researcher ..> Synthesis_Engine
+
+    %% The Generation <-> Critic Loop
+    Synthesis_Engine --> RAG_Critic : "Draft Report"
+    RAG_Critic --|> Synthesis_Engine : "Retry with Corrections"
+    
+    %% Final Gate
+    RAG_Critic --> RAG_Agent : "Verified Report"

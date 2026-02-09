@@ -1,0 +1,51 @@
+%%{init: {'theme':'default', 'themeVariables': { 'background': '#ffffff'}}}%%
+
+classDiagram
+direction TB
+
+%% =====================
+%% RAG AGENT & SUB-AGENTS
+%% =====================
+class RAG_Agent {
+    +investigate_alert()
+}
+
+class DBSearchAgent {
+    +query_context()
+    -_generate_sql()
+    -_get_vector_matches()
+}
+
+class WebSearchAgent {
+    +scrape_news()
+}
+
+RAG_Agent --> DBSearchAgent
+RAG_Agent --> WebSearchAgent
+
+%% =====================
+%% DATABASE TOOLS
+%% =====================
+class ChromaManager {
+    +similarity_search()
+    <<Vector Store>>
+}
+
+class SQLManager {
+    +execute_query()
+    +get_schema()
+    <<Relational DB>>
+}
+
+DBSearchAgent --> ChromaManager : "Unstructured / Behavioral"
+DBSearchAgent --> SQLManager : "Structured / Statistical"
+
+%% =====================
+%% DATA SOURCES
+%% =====================
+class KaggleDataset {
+    <<CSV / Parquet>>
+}
+
+SQLManager ..> KaggleDataset : "Ingests into Tables"
+ChromaManager ..> KaggleDataset : "Embeds into Vectors"

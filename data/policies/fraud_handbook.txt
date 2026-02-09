@@ -1,0 +1,18 @@
+BANKING OPERATIONAL POLICY: FRAUD RED FLAGS & ESCALATION (v2026.1)
+
+POLICY_CODE: GEO-001 - GEOGRAPHIC ANOMALIES
+- Transactions originating more than 500 miles from the customer's primary residence or last known 'safe' location are flagged as 'Geographic Anomalies'.
+- High-Risk Regions: Transactions from Nigeria, North Korea, or Eastern Europe require a mandatory cross-reference with 'Web Threat Intelligence' for active BIN attacks.
+- Escalation: If a Geographic Anomaly occurs at a new merchant, apply a 24-hour hold.
+
+POLICY_CODE: VEL-002 - VELOCITY & FREQUENCY
+- Excessive Attempt Limit: More than 3 failed CVV attempts within 10 minutes must trigger an account freeze.
+- Rapid Fire: Two or more transactions exceeding $1,000 within a 60-minute window require multi-factor authentication (MFA) regardless of location.
+
+POLICY_CODE: AMT-003 - AMOUNT SIGNIFICANCE
+- Standard Deviation Rule: Any transaction exceeding 3.5x the user's rolling 90-day average transaction amount is considered a 'Value Outlier'.
+- First-Time Merchant Limit: If the merchant has no historical record in the user's SQL history, any transaction over $500 must be verified via the mobile app.
+
+POLICY_CODE: NET-004 - MERCHANT THREAT ALIGNMENT
+- Known Breach Protocol: If Web_Researcher identifies a merchant as 'Compromised' or 'In-Breach', all transactions at that merchant within the last 48 hours must be reviewed.
+- Strategic Weighting: A transaction flagged by an Anomaly Model (RNN/ANN) that aligns with a Web-reported merchant breach is categorized as 'CRITICAL' risk.

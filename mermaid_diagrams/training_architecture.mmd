@@ -1,0 +1,53 @@
+%%{init: {'theme':'default', 'themeVariables': { 'background': '#ffffff'}}}%%
+
+graph TD
+    %% Entry
+    Start([Start Training Process]) --> Orchestrator[<b>FraudPipeline Orchestrator</b>]
+
+    %% Phase 1
+    subgraph P1 [Phase 1: Data Foundation]
+        Orchestrator --> Foundation[run_data_foundation]
+        Foundation --> ETL[SQL Migration & Scaling]
+        ETL --> DB[(Project Database)]
+    end
+
+    %% Fork Point
+    DB --> Fork{{"Parallel Tournament Initialization"}}
+
+    %% Phase 2
+    subgraph P2 [Phase 2: Modeling Championship]
+        direction TB
+
+        Fork --> SupTeam[Supervised Team]
+        subgraph SupExec [Supervised Tournament]
+            SupTeam --> RF[Random Forest]
+            SupTeam --> XGB[XGBoost]
+            SupTeam --> ANN[Neural Network]
+        end
+
+        Fork --> AnomTeam[Anomaly Team]
+        subgraph AnomExec [Unsupervised Discovery]
+            AnomTeam --> Clu[Clustering Agents]
+            AnomTeam --> Neu[Neural Pattern Agents]
+        end
+    end
+
+    %% Symmetric Join
+    SupExec --> Aggregator
+    AnomExec --> Aggregator
+
+    %% Phase 3
+    subgraph P3 [Phase 3: Metadata Persistence]
+        Aggregator[<b>Decision Aggregator Agent</b>] --> Tool[save_inference_metadata]
+        Tool --> JSON[<b>champion_registry.json</b>]
+    end
+
+    %% Exit
+    JSON --> End([End Training: Models Exported])
+
+    %% Styling
+    style P1 fill:#f9f9f9,stroke:#333
+    style P2 fill:#e1f5fe,stroke:#01579b
+    style P3 fill:#fff3e0,stroke:#ef6c00
+    style JSON fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style Fork fill:#333,color:#fff

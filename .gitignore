@@ -1,0 +1,27 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Python environment
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+.python-version
+
+.env
+data/kaggle/*.csv
+processed_data/*.csv
+*.sqlite
+*.sqlite3
+*.db
+.idea/

@@ -1,0 +1,28 @@
+[
+    {
+        "id": "CASE_001",
+        "description": "High-Value International Anomaly",
+        "task": "Transaction of $1,200 for Brandon Pittman in Kyiv, Ukraine. Home: USA."
+    },
+    {
+        "id": "CASE_002",
+        "description": "Rapid-Fire Micro-Transactions",
+        "task": "15 transactions of $4.99 within 5 minutes for Sarah Chen at 'Digital Services Kyiv'."
+    },
+    {
+        "id": "CASE_003",
+        "description": "Large Domestic Outlier",
+        "task": "$4,500 transaction at 'Luxury Watches NY' for Mike Ross. Historical max is $200."
+    },
+    {
+        "id": "CASE_004",
+        "description": "Routine Grocery Store",
+        "task": "$64.20 at 'Whole Foods' for Alice Johnson. 2 miles from home. Routine time."
+    },
+    {
+        "id": "CASE_005",
+        "description": "Recurring Subscription",
+        "task": "Monthly $15.99 Netflix charge for David Smith. Matches 12-month history."
+    },
+    {"id": "CASE_006", "desc": "Travel Notice", "task": "$35.00 at 'Paris Metro' for Elena Rodriguez. Note: Elena placed a travel notice for France."}
+]

@@ -1,0 +1,41 @@
+[project]
+name = "mas-fraud-detector"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "autogen-agentchat",
+    "autogen-core",
+    "autogen-ext",
+    "pandas",            # Added for DataHandler and Pipeline loops
+    "numpy",             # Added for RMS math in LogicGatekeeper
+    "ipykernel",
+    "python_dotenv",
+    "tiktoken",
+    "ollama",
+    "openai",
+    "mistralai",
+    "json-schema-to-pydantic",
+    "langchain-community",
+    "arxiv",
+    "wikipedia",
+    "streamlit",
+    "docker",
+    "autogen-ext[docker]",
+    "scikit-learn",
+    "imbalanced-learn",
+    "seaborn",
+    "matplotlib",
+    "autogen-ext[mistral]",
+    "xgboost",
+    "minisom",
+    "torch",
+    "langchain",
+    "langchain-openai",
+    "chroma",
+    "chromadb",
+    "tabulate"
+]
+[tool.uv.extra-build-dependencies]
+ipython-cluster-helper = ["pip"]

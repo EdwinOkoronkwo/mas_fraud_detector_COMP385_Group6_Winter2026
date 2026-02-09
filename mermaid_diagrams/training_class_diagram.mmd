@@ -1,0 +1,105 @@
+%%{init: {'theme':'default', 'themeVariables': { 'background': '#ffffff'}}}%%
+
+classDiagram
+direction TB
+
+%% =====================
+%% CLIENT / UI LAYER
+%% =====================
+class StreamlitDashboard {
+    +render_ui()
+    +handle_user_query()
+}
+
+class IPipeline {
+    <<interface>>
+    +run_pipeline()
+}
+
+class FraudPipeline {
+    +run_data_foundation()
+    +run_supervised_tournament()
+    +run_anomaly_discovery()
+}
+
+StreamlitDashboard --> IPipeline
+IPipeline <|.. FraudPipeline
+
+%% =====================
+%% DATA FOUNDATION TIER
+%% =====================
+class IIngestor {
+    <<interface>>
+    +run() : "CSV to SQLite"
+}
+class IEDAAgent {
+    <<interface>>
+    +run() : "Stats/Imbalance"
+}
+class ICleanerAgent {
+    <<interface>>
+    +run() : "Scale/Transform"
+}
+
+FraudPipeline --> IIngestor
+FraudPipeline --> IEDAAgent
+FraudPipeline --> ICleanerAgent
+
+IIngestor <|.. SQL_Ingestor_Agent
+IEDAAgent <|.. EDA_Agent
+ICleanerAgent <|.. Cleaner_Agent
+
+%% =====================
+%% STRATEGY & EVALUATION TIER
+%% =====================
+class IPlanningStrategy {
+    <<interface>>
+    +generate_plan()
+}
+IPlanningStrategy <|.. SequentialPlanner
+IPlanningStrategy <|.. ParallelPlanner
+
+class ICriticStrategy {
+    <<interface>>
+    +evaluate()
+}
+ICriticStrategy <|.. MetricCritic
+ICriticStrategy <|.. ModelConsistencyCritic
+
+FraudPipeline --> IPlanningStrategy
+FraudPipeline --> ICriticStrategy
+
+%% =====================
+%% ML STRATEGIES
+%% =====================
+class ISupervisedAgent {
+    <<interface>>
+    +run()
+}
+class IAnomalyAgent {
+    <<interface>>
+    +run()
+}
+
+FraudPipeline --> ISupervisedAgent
+FraudPipeline --> IAnomalyAgent
+
+ISupervisedAgent <|.. RF_Agent
+ISupervisedAgent <|.. XGB_Agent
+ISupervisedAgent <|.. ANN_Agent
+ISupervisedAgent <|.. LR_Agent
+
+class IClustering { <<interface>> +cluster_and_flag() }
+class INeuroPattern { <<interface>> +reconstruct_and_flag() }
+
+IAnomalyAgent <|-- IClustering
+IAnomalyAgent <|-- INeuroPattern
+
+IClustering <|.. DBSCAN_Agent
+IClustering <|.. SOM_Agent
+IClustering <|.. KMeans_Agent
+IClustering <|.. IForest_Agent
+
+INeuroPattern <|.. AE_Standard_Agent
+INeuroPattern <|.. VAE_Agent
+INeuroPattern <|.. RNN_AE_Agent

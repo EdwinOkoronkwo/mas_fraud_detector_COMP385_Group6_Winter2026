@@ -1,0 +1,44 @@
+%%{init: {'theme':'default', 'themeVariables': { 'background': '#ffffff'}}}%%
+
+graph TD
+    %% Start
+    Start([New Transaction Data]) --> DataHand[<b>DataHandler</b>]
+
+    %% Phase 1: Preprocessing
+    subgraph P1 [1. Real-time Preprocessing]
+        DataHand --> Prep[Apply Scaling & SMOTE Transform]
+        Prep --> Registry[Fetch Champion Models Registry]
+    end
+
+    %% Phase 2: Parallel Prediction
+    subgraph P2 [2. Parallel Model Execution]
+        direction LR
+        Registry --> LR_Model[<b>LR Champion</b><br/>Supervised]
+        Registry --> RNN_Model[<b>RNN-AE Champion</b><br/>Neural Pattern]
+        Registry --> DB_Model[<b>DBSCAN Champion</b><br/>Clustering]
+    end
+
+    %% Phase 3: Result Aggregation
+    subgraph P3 [3. Result Aggregation]
+        LR_Model & RNN_Model & DB_Model --> Agg[Ensemble Aggregator]
+        Agg --> Parse[Parse Score Strings to Floats]
+    end
+
+    %% Phase 4: The Logic Gate
+    subgraph P4 [4. Logic Gatekeeper]
+        Parse --> LG[<b>LogicGatekeeper</b>]
+        LG --> Rules{Business Rules}
+        Rules --> |High Value| HV[Adaptive Weighting]
+        Rules --> |Screamer| SC[Confidence Boost]
+        Rules --> |Shield| LS[Low-Value Shield]
+    end
+
+    %% Output
+    LG --> Report[Report Generator]
+    Report --> End([Final Fraud Report])
+
+    %% Styling
+    style P1 fill:#f9f9f9,stroke:#333
+    style P2 fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    style P3 fill:#fff3e0,stroke:#ef6c00
+    style P4 fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px

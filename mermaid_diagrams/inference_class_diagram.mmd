@@ -1,0 +1,108 @@
+%%{init: {'theme':'default', 'themeVariables': { 'background': '#ffffff'}}}%%
+
+classDiagram
+direction TB
+
+%% =====================
+%% CLIENT / UI LAYER
+%% =====================
+class StreamlitClient {
+    +trigger_batch_inference()
+    +display_report()
+}
+
+class IInferencePipeline {
+    <<interface>>
+    +run_batch_inference()
+}
+
+StreamlitClient --> IInferencePipeline
+
+%% =====================
+%% THE MASTER CONDUCTOR (CENTER)
+%% =====================
+class FraudInferencePipeline {
+    +run_batch_inference(n_samples)
+}
+
+IInferencePipeline <|.. FraudInferencePipeline
+
+%% =====================
+%% CORE INFERENCE INTERFACES
+%% =====================
+class IDataHandler {
+    <<interface>>
+    +fetch_balanced_samples()
+}
+
+class IAgentOrchestrator {
+    <<interface>>
+    +execute_with_resilience()
+}
+
+class ILogicGatekeeper {
+    <<interface>>
+    +apply_final_verdict()
+    +update_performance_metrics()
+}
+
+class IReportGenerator {
+    <<interface>>
+    +print_detailed_reports()
+}
+
+%% FraudInferencePipeline Dependencies
+FraudInferencePipeline --> IDataHandler
+FraudInferencePipeline --> IAgentOrchestrator
+FraudInferencePipeline --> ILogicGatekeeper
+FraudInferencePipeline --> IReportGenerator
+
+%% Concrete Implementations
+IDataHandler <|.. DataHandler
+IAgentOrchestrator <|.. AgentOrchestrator
+ILogicGatekeeper <|.. LogicGatekeeper
+IReportGenerator <|.. ReportGenerator
+
+%% =====================
+%% LOGIC GATEKEEPER STRATEGIES
+%% =====================
+class GatekeeperRule {
+    <<abstract>>
+    +evaluate(scores, amt)*
+}
+
+LogicGatekeeper o-- GatekeeperRule
+GatekeeperRule <|-- LowValueShieldRule
+GatekeeperRule <|-- HighConfidenceLRRule
+GatekeeperRule <|-- HighValueConsensusRule
+GatekeeperRule <|-- ExtremeAnomalyRule
+
+%% =====================
+%% SPECIALIZED INVESTIGATIVE AGENTS
+%% =====================
+class LeadInvestigator { +investigate() }
+class SQLResearcher { +query_db() }
+class PreprocessingAgent { +clean_data() }
+class InferenceAgent { +run_models() }
+class VectorResearcher { +search_vector_db() }
+class SynthesisEngine { +generate_report() }
+class RAGCritic { +verify_logic() }
+
+AgentOrchestrator --> LeadInvestigator
+AgentOrchestrator --> SQLResearcher
+AgentOrchestrator --> PreprocessingAgent
+AgentOrchestrator --> InferenceAgent
+AgentOrchestrator --> VectorResearcher
+AgentOrchestrator --> SynthesisEngine
+AgentOrchestrator --> RAGCritic
+
+%% =====================
+%% DATA SOURCES & INFRASTRUCTURE
+%% =====================
+class SQLiteDB { <<Resource>> }
+class VectorDB { <<Resource>> }
+
+%% Spatial positioning logic: placing DB-reliant agents near resources
+DataHandler ..> SQLiteDB : "Ground Truth"
+SQLResearcher ..> SQLiteDB : "Evidence Extraction"
+VectorResearcher ..> VectorDB : "Contextual Search"
