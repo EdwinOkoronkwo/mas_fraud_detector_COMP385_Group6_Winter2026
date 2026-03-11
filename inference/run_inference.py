@@ -4,7 +4,7 @@ import asyncio
 from config.llm_config import get_model_client
 from config.settings import DB_PATH
 from inference.FraudInferencePipeline import FraudInferencePipeline
-from rag.rag_team import RAGTeam
+from rag.inference_team import RAGTeam
 from rag.vector_service import VectorService
 
 

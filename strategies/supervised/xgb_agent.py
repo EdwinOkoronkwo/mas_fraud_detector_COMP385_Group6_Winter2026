@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pandas as pd
 import numpy as np
 import os
@@ -9,14 +11,17 @@ from sklearn.metrics import recall_score, f1_score, roc_auc_score, confusion_mat
 from autogen_agentchat.agents import AssistantAgent
 from typing import Dict, Any
 import joblib
-from config.settings import TEMP_SPLIT_PATH
+from config.settings import settings
 from tools.training.supervised_common_tools import save_confusion_matrix
 from utils.logger import setup_logger
 
 logger = setup_logger("XGB_Tool")
 
-def train_xgb_with_grid_search(data_pickle_path: str) -> str:
-    # Silence XGBoost internal warnings
+def train_xgb_flexible(data_pickle_path: str, n_estimators: int, max_depth: int, learning_rate: float,
+                       threshold: float = 0.5) -> str:
+    """
+    Trains XGBoost with specific hyperparameters and a custom decision threshold proposed by the Agent.
+    """
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=UserWarning, module="xgboost")
         try:
@@ -25,63 +30,45 @@ def train_xgb_with_grid_search(data_pickle_path: str) -> str:
 
             X_train, X_test, y_train, y_test = joblib.load(data_pickle_path)
 
-            # SPEED FIX: Consistent with LR to ensure the tournament finishes
-            if len(X_train) > 20000:
-                X_train = X_train.sample(20000, random_state=42)
-                y_train = y_train.loc[X_train.index]
+            logger.info(f"--- XGB: Training with {n_estimators} trees, LR: {learning_rate}, Threshold: {threshold} ---")
 
-            param_grid = {
-                'n_estimators': [100, 200],
-                'max_depth': [3, 5, 7],
-                'learning_rate': [0.01, 0.1],
-                'subsample': [0.8]
-            }
-
-            # REMOVED: use_label_encoder (deprecated)
-            # ADDED: tree_method='hist' for a massive speed boost
-            xgb = XGBClassifier(
-                eval_metric='logloss',
+            # Initialize with Agent-provided params
+            # tree_method='hist' is kept for speed efficiency
+            model = XGBClassifier(
+                n_estimators=n_estimators,
+                max_depth=max_depth,
+                learning_rate=learning_rate,
+                subsample=0.8,
                 tree_method='hist',
+                eval_metric='logloss',
                 random_state=42,
                 n_jobs=-1
             )
 
-            grid_search = GridSearchCV(
-                estimator=xgb,
-                param_grid=param_grid,
-                scoring='recall',
-                cv=2, # Reduced from 3 for speed
-                n_jobs=-1
-            )
+            model.fit(X_train, y_train)
 
-            grid_search.fit(X_train, y_train)
-            best_model = grid_search.best_estimator_
-
-            # --- ADD THIS: PERSISTENCE STEP ---
+            # Persistence
             model_dir = "mas_fraud_detector/models"
             os.makedirs(model_dir, exist_ok=True)
             model_save_path = os.path.join(model_dir, "champion_xgb.joblib")
+            joblib.dump(model, model_save_path)
 
-            joblib.dump(best_model, model_save_path)
-            logger.info(f"--- XGB: Model persisted to {model_save_path} ---")
+            # Evaluation with custom thresholding
+            probs = model.predict_proba(X_test)[:, 1]
+            preds = (probs >= threshold).astype(int)
 
-            # 1. Get probabilities instead of hard 0/1 predictions
-            probs = best_model.predict_proba(X_test)[:, 1]
-
-            # 2. Find the best threshold for recall (e.g., trying 0.1, 0.2, 0.3)
-            # Or just force a lower threshold to see if it beats LR
-            best_threshold = 0.2
-            preds = (probs >= best_threshold).astype(int)
-
-            # 3. Recalculate Confusion Matrix with the new threshold
             cm = confusion_matrix(y_test, preds)
             plot_path = save_confusion_matrix(cm, "Extreme Gradient Boosting")
 
             metrics = {
                 "model": "extreme gradient boosting",
-                "saved_path": model_save_path,  # Add this to the JSON so the Aggregator knows
-                "best_params": grid_search.best_params_,
-                "plot_url": plot_path,
+                "status": "SUCCESS",
+                "parameters_used": {
+                    "n_estimators": n_estimators,
+                    "max_depth": max_depth,
+                    "learning_rate": learning_rate,
+                    "threshold": threshold
+                },
                 "recall": round(recall_score(y_test, preds), 4),
                 "f1_score": round(f1_score(y_test, preds), 4),
                 "roc_auc": round(roc_auc_score(y_test, probs), 4),
@@ -93,21 +80,166 @@ def train_xgb_with_grid_search(data_pickle_path: str) -> str:
             return json.dumps(metrics, indent=2)
 
         except Exception as e:
-            return f"XGBOOST GRID SEARCH ERROR: {str(e)}"
+            return f"XGBOOST FLEXIBLE ERROR: {str(e)}"
 
 
 class XGBAgent:
-    def __init__(self, model_client, project_root_path):
-
-        def run_xgb_training() -> str:
-            return train_xgb_with_grid_search(TEMP_SPLIT_PATH)
+    def __init__(self, model_client, project_root_path=None):
+        def run_xgb_training(n_estimators: int, max_depth: int, learning_rate: float, threshold: float) -> str:
+            return train_xgb_flexible(
+                data_pickle_path=settings.TEMP_SPLIT_PATH,
+                n_estimators=n_estimators,
+                max_depth=max_depth,
+                learning_rate=learning_rate,
+                threshold=threshold
+            )
 
         self.agent = AssistantAgent(
             name="XGB_Agent",
             model_client=model_client,
             tools=[run_xgb_training],
-            system_message="""You are a code execution unit. 
-                Your ONLY action is to call 'run_xgb_training'. 
-                Do not explain. Do not predict results. 
-                If you do not call the tool, you have failed the mission."""
+            system_message="""You are a Gradient Boosting Architect (XGBoost Specialist). 
+            Your goal is to build a high-performance ensemble that targets rare fraud events while strictly managing Operational Noise.
+
+            BOOSTING STRATEGY:
+            1. LEARNING PACE: Use a conservative learning_rate (0.01 - 0.05) paired with sufficient n_estimators (300-800) to ensure the model captures subtle fraud patterns without overfitting.
+            2. TREE ARCHITECTURE: Set max_depth between 3 and 6. Fraud detection benefits from shallow trees that capture broad interaction patterns rather than deep trees that memorize specific data noise.
+            3. THE PRECISION-RECALL LEVER (threshold): 
+               - Standard default is 0.5.
+               - A threshold of 0.3 is AGGRESSIVE; it will maximize Recall but often causes a catastrophic drop in F1-score due to high False Positives (FP).
+               - Only lower the threshold below 0.5 if you can justify that the cost of a missed fraud case (False Negative) significantly outweighs the operational cost of investigating a False Positive.
+
+            CRITICAL INSTRUCTION:
+            Target an F1-Score above 0.30. Do not sacrifice Precision entirely for the sake of Recall. If previous attempts showed high FP counts (e.g., >300), you MUST increase the threshold or decrease tree complexity.
+
+            TASK:
+            Analyze the imbalanced nature of the data. Propose a configuration and call 'run_xgb_training'. You must explicitly justify your 'threshold' choice in your reasoning."""
         )
+
+# class XGBAgent:
+#     def __init__(self, model_client, project_root_path=None):
+#         # Wrapper passing Agent's expert decisions to the tool
+#         def run_xgb_training(n_estimators: int, max_depth: int, learning_rate: float, threshold: float) -> str:
+#             return train_xgb_flexible(
+#                 data_pickle_path=TEMP_SPLIT_PATH,
+#                 n_estimators=n_estimators,
+#                 max_depth=max_depth,
+#                 learning_rate=learning_rate,
+#                 threshold=threshold
+#             )
+#
+#         self.agent = AssistantAgent(
+#             name="XGB_Agent",
+#             model_client=model_client,
+#             tools=[run_xgb_training],
+#             system_message="""You are the Gradient Boosting Specialist (XGBoost).
+#             You use your expertise to optimize boosting rounds and decision thresholds.
+#
+#             GUIDELINES:
+#             1. 'learning_rate': Use 0.01 for a conservative "slow learn" or 0.1 for faster convergence.
+#             2. 'max_depth': Keep it low (3-6) to avoid overfitting the noise in fraud data.
+#             3. 'threshold': In fraud, the cost of a False Negative is high. If you want to increase
+#                RECALL, propose a lower threshold (e.g., 0.2 or 0.3) instead of the default 0.5.
+#
+#             TASK:
+#             Review the Data Foundation details. Propose a configuration that balances
+#             high recall without completely destroying precision.
+#             Call 'run_xgb_training' with your selection."""
+#         )
+
+# def train_xgb_with_grid_search(data_pickle_path: str) -> str:
+#     # Silence XGBoost internal warnings
+#     with warnings.catch_warnings():
+#         warnings.filterwarnings("ignore", category=UserWarning, module="xgboost")
+#         try:
+#             if not os.path.exists(data_pickle_path):
+#                 return f"ERROR: Temp data not found at {data_pickle_path}"
+#
+#             X_train, X_test, y_train, y_test = joblib.load(data_pickle_path)
+#
+#             # SPEED FIX: Consistent with LR to ensure the tournament finishes
+#             if len(X_train) > 20000:
+#                 X_train = X_train.sample(20000, random_state=42)
+#                 y_train = y_train.loc[X_train.index]
+#
+#             param_grid = {
+#                 'n_estimators': [100, 200],
+#                 'max_depth': [3, 5, 7],
+#                 'learning_rate': [0.01, 0.1],
+#                 'subsample': [0.8]
+#             }
+#
+#             # REMOVED: use_label_encoder (deprecated)
+#             # ADDED: tree_method='hist' for a massive speed boost
+#             xgb = XGBClassifier(
+#                 eval_metric='logloss',
+#                 tree_method='hist',
+#                 random_state=42,
+#                 n_jobs=-1
+#             )
+#
+#             grid_search = GridSearchCV(
+#                 estimator=xgb,
+#                 param_grid=param_grid,
+#                 scoring='recall',
+#                 cv=2, # Reduced from 3 for speed
+#                 n_jobs=-1
+#             )
+#
+#             grid_search.fit(X_train, y_train)
+#             best_model = grid_search.best_estimator_
+#
+#             # --- ADD THIS: PERSISTENCE STEP ---
+#             model_dir = "mas_fraud_detector/models"
+#             os.makedirs(model_dir, exist_ok=True)
+#             model_save_path = os.path.join(model_dir, "champion_xgb.joblib")
+#
+#             joblib.dump(best_model, model_save_path)
+#             logger.info(f"--- XGB: Model persisted to {model_save_path} ---")
+#
+#             # 1. Get probabilities instead of hard 0/1 predictions
+#             probs = best_model.predict_proba(X_test)[:, 1]
+#
+#             # 2. Find the best threshold for recall (e.g., trying 0.1, 0.2, 0.3)
+#             # Or just force a lower threshold to see if it beats LR
+#             best_threshold = 0.2
+#             preds = (probs >= best_threshold).astype(int)
+#
+#             # 3. Recalculate Confusion Matrix with the new threshold
+#             cm = confusion_matrix(y_test, preds)
+#             plot_path = save_confusion_matrix(cm, "Extreme Gradient Boosting")
+#
+#             metrics = {
+#                 "model": "extreme gradient boosting",
+#                 "saved_path": model_save_path,  # Add this to the JSON so the Aggregator knows
+#                 "best_params": grid_search.best_params_,
+#                 "plot_url": plot_path,
+#                 "recall": round(recall_score(y_test, preds), 4),
+#                 "f1_score": round(f1_score(y_test, preds), 4),
+#                 "roc_auc": round(roc_auc_score(y_test, probs), 4),
+#                 "confusion_matrix": {
+#                     "tn": int(cm[0, 0]), "fp": int(cm[0, 1]),
+#                     "fn": int(cm[1, 0]), "tp": int(cm[1, 1])
+#                 }
+#             }
+#             return json.dumps(metrics, indent=2)
+#
+#         except Exception as e:
+#             return f"XGBOOST GRID SEARCH ERROR: {str(e)}"
+#
+#
+# class XGBAgent:
+#     def __init__(self, model_client, project_root_path):
+#
+#         def run_xgb_training() -> str:
+#             return train_xgb_with_grid_search(TEMP_SPLIT_PATH)
+#
+#         self.agent = AssistantAgent(
+#             name="XGB_Agent",
+#             model_client=model_client,
+#             tools=[run_xgb_training],
+#             system_message="""You are a code execution unit.
+#                 Your ONLY action is to call 'run_xgb_training'.
+#                 Do not explain. Do not predict results.
+#                 If you do not call the tool, you have failed the mission."""
+#         )

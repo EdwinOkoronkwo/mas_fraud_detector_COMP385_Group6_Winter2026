@@ -1,0 +1,63 @@
+%%{init: {'theme':'default', 'themeVariables': { 'background': '#ffffff'}}}%%
+
+graph TD
+    %% Entry from P1
+    DataIn[(Cleaned & Scaled Data)] --> PrepTool[<b>prepare_championship_data_tool</b>]
+
+    %% Data Preparation Utility
+    subgraph PrepMethods [Data Preparation Logic]
+        direction TB
+        XY[<b>1. Target Assignment</b><br/>X: Features / y: 'is_fraud']
+        Split[<b>2. Stratified 3-Way Split</b><br/>Train - Validation - Test]
+        Balance[<b>3. Training SMOTE</b><br/>Balance Train Subset Only]
+
+        XY --> Split --> Balance
+    end
+
+    PrepTool --> PrepMethods
+    PrepMethods --> Temp[(<b>temp_split.joblib</b>)]
+
+    %% Parallel Tournament Fork
+    Temp --> Route{{"Data Routing Gate"}}
+
+    %% Parallel Branches
+    Route --> |"X + y (Train/Val)"| SupTournament
+    Route --> |"X only (Train)"| UnsupTournament
+
+    %% Supervised Branch
+    subgraph SupTournament [<b>Supervised Tournament Team</b>]
+        direction TB
+        S_Static[<b>Static Models</b><br/>Fixed RF & XGB]
+        S_Dynamic[<b>Dynamic Models</b><br/>AI-Tuned RF & XGB]
+        S_Dynamic -.-> |"Uses Validation Set"| S_Dynamic
+    end
+
+    %% Unsupervised Branch
+    subgraph UnsupTournament [<b>Unsupervised Discovery Team</b>]
+        direction TB
+        subgraph Clustering [Clustering Group]
+            C_Static[Static KMeans / DBScan]
+            C_Dynamic[Dynamic KMeans / DBScan]
+        end
+        subgraph Neuro [Neuro-Pattern Group]
+            N_Static[Static VAE / RNN_AE]
+            N_Dynamic[Dynamic VAE / RNN_AE]
+        end
+    end
+
+    %% Baseline & Aggregation
+    SupTournament --> Aggregator
+    UnsupTournament --> Aggregator
+    Temp --> |"Raw Control"| Baseline[Baseline XGBoost] --> Aggregator
+
+    %% Phase 3: Selection
+    subgraph Phase3 [Phase 3: Champion Selection]
+        Aggregator[<b>Decision Aggregator Agent</b>]
+        Aggregator --> Registry[(<b>champion_registry.json</b>)]
+    end
+
+    %% Styling
+    style PrepMethods fill:#fff9c4,stroke:#fbc02d,stroke-dasharray: 5 5
+    style SupTournament fill:#e3f2fd,stroke:#1565c0
+    style UnsupTournament fill:#f3e5f5,stroke:#7b1fa2
+    style Registry fill:#c8e6c9,stroke:#2e7d32

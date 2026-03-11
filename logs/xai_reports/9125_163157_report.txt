@@ -1,0 +1,70 @@
+```markdown
+# **XAI Fraud Risk Report**
+**Transaction ID**: `4874017206859125` | **Amount**: `$274.01` | **Mode**: Low-Value (≤$1,000)
+
+---
+## **Verdict**: **INVESTIGATE**
+**Confidence**: **42.3%** (Below 50% threshold)
+**Logic Trigger**: **Neural/Clustering Disagreement with Supervised**
+**Business Context**: Potential **zero-day fraud pattern** or **behavioral anomaly** requiring manual review.
+
+---
+## **1. Score Breakdown (40/40/20 Weighted Ensemble)**
+| Pillar         | Score   | Weight | Contribution |
+|----------------|---------|--------|--------------|
+| Supervised (XGBoost) | 0.0872  | 40%    | **0.0349**   |
+| Neural (RNN)   | 0.6123  | 40%    | **0.2449**   |
+| Clustering (DBSCAN) | 0.4567 | 20%    | **0.0913**   |
+| **TOTAL**      | **0.4231** |        |              |
+
+**Math**:
+`(0.0872 * 0.40) + (0.6123 * 0.40) + (0.4567 * 0.20) = 0.4231`
+
+---
+## **2. Override Analysis**
+- **Override**: `None`
+  - **Why?** No gatekeeper rule was triggered:
+    - **Low-Value Shield**: Inactive (score not reduced; amount > typical low-value threshold).
+    - **High-Confidence Supervised**: Not triggered (XGBoost score = 8.7% < 95% threshold).
+    - **Extreme Anomaly**: Not triggered (Neural/Clustering agreement = 61.2%/45.7% < 90% threshold).
+
+---
+## **3. Model Conflict Diagnosis**
+### **Key Observations**:
+- **Supervised (8.7%) vs. Neural (61.2%)**:
+  - **Interpretation**: The transaction resembles **known benign patterns** (low XGBoost score) but exhibits **novel anomalies** (high RNN score).
+  - **Hypothesis**:
+    - **Zero-Day Fraud**: New attack vector not yet labeled in training data.
+    - **Behavioral Drift**: Legitimate user with sudden atypical behavior (e.g., device/location change).
+    - **Data Leakage**: Supervised model may be overfitting to outdated labels.
+
+- **Clustering (45.7%)**:
+  - **Context**: DBSCAN flags the transaction as a **mild outlier** in behavioral space (e.g., unusual time/velocity but not extreme).
+
+### **Recommended Actions**:
+1. **Manual Review**:
+   - Check for **velocity patterns** (e.g., rapid successive transactions).
+   - Validate **device/geo consistency** against user profile.
+2. **Model Feedback Loop**:
+   - If confirmed fraud: Retrain **Supervised** model with new labels.
+   - If false positive: Adjust **Neural** sensitivity or add contextual rules (e.g., whitelist trusted devices).
+3. **Monitor**:
+   - Track similar transactions for **emerging patterns** (potential ATO/botnet activity).
+
+---
+## **4. Business Impact**
+- **Risk**: Medium
+  - **False Positive Cost**: Manual review overhead (~$5–$10 operational cost).
+  - **False Negative Cost**: Potential chargeback (~$274 + fees + reputational damage).
+- **Suggestion**:
+  - For **low-value transactions**, consider **step-up authentication** (e.g., OTP) instead of outright blocking to balance UX and risk.
+
+---
+## **5. Visual Summary**
+```
+Supervised: [=====       ] 8.7%  (Trusted)
+Neural:     [============= ] 61.2% (Suspicious)
+Clustering: [=========    ] 45.7% (Outlier)
+Total:      [========     ] 42.3% → INVESTIGATE
+```
+```

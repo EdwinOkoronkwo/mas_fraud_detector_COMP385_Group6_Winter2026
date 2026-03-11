@@ -1,6 +1,5 @@
 import os
 
-from autogen_core.models import ModelFamily
 from dotenv import load_dotenv
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 
@@ -19,6 +18,21 @@ def get_model_client():
             "function_calling": True,
             "json_output": False,
             "family": "mistral",
-            "structured_output": True # Set to False to avoid role-order conflicts during tool parsing
+            "structured_output": False# Set to False to avoid role-order conflicts during tool parsing
         }
     )
+
+# def get_model_client():
+#     return OpenAIChatCompletionClient(
+#         model="llama3.1:latest", # Updated from qwen2.5:14b
+#         timeout=600,
+#         api_key="ollama",
+#         base_url="http://localhost:11434/v1",
+#         model_info={
+#             "vision": False,
+#             "function_calling": True,
+#             "json_output": True,
+#             "family": "llama3", # Updated family
+#             "structured_output": False,
+#         }
+#     )

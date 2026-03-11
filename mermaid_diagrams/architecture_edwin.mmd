@@ -1,0 +1,45 @@
+graph LR
+    subgraph Component1 [1. Client Layer]
+        direction TB
+        A_H[UI Header] --- A1[index.html]
+        A1 --- A2[JS API Client Class]
+        A2 --- A3[JS UI Renderer Class]
+        A3 --- A_F[UI Footer]
+    end
+
+    subgraph Component4 [Data Storage]
+        direction TB
+        D_H[File Header] --- D1[headline_edwin.txt]
+        D1 --- D2[File System Resource]
+        D2 --- D3[Local Disk IO]
+        D3 --- D_F[File Footer]
+    end
+
+    subgraph Component2 [2. Serverless Layer]
+        direction TB
+        B_H[API Header] --- B1[app.py Orchestrator]
+        B1 --- B2[Translator Factory]
+        B2 --- B3[Strategy Pipeline]
+        B3 --- B_F[API Footer]
+    end
+
+    subgraph Component3 [3. Cloud Layer]
+        direction TB
+        C_H[Cloud Header] --- C1[Boto3 SDK]
+        C1 --- C2[AWS IAM Auth]
+        C2 --- C3[Amazon Translate]
+        C3 --- C_F[Cloud Footer]
+    end
+
+    Component1 ==>|HTTP GET /headlines| Component2
+    Component2 -.->|Read| Component4
+    Component2 ==>|Translate Request| Component3
+
+    style A_H fill:none,stroke:none,color:#fff
+    style A_F fill:none,stroke:none,color:#fff
+    style B_H fill:none,stroke:none,color:#fff
+    style B_F fill:none,stroke:none,color:#fff
+    style C_H fill:none,stroke:none,color:#fff
+    style C_F fill:none,stroke:none,color:#fff
+    style D_H fill:none,stroke:none,color:#fff
+    style D_F fill:none,stroke:none,color:#fff

@@ -1,0 +1,95 @@
+{
+    "model_metadata": {
+        "type": "XGBoost_Baseline_Static",
+        "library_version": "xgboost_sklearn",
+        "random_state": 42
+    },
+    "recreation_specs": {
+        "best_params": {
+            "max_depth": 5,
+            "n_estimators": 200,
+            "scale_pos_weight": 1
+        },
+        "feature_count": 27,
+        "feature_names": [
+            "amt",
+            "zip",
+            "lat",
+            "long",
+            "city_pop",
+            "unix_time",
+            "merch_lat",
+            "merch_long",
+            "amt_to_cat_avg",
+            "high_risk_time",
+            "txn_velocity",
+            "category_entertainment",
+            "category_food_dining",
+            "category_gas_transport",
+            "category_grocery_net",
+            "category_grocery_pos",
+            "category_health_fitness",
+            "category_home",
+            "category_kids_pets",
+            "category_misc_net",
+            "category_misc_pos",
+            "category_personal_care",
+            "category_shopping_net",
+            "category_shopping_pos",
+            "category_travel",
+            "gender_F",
+            "gender_M"
+        ],
+        "threshold_applied": 0.5
+    },
+    "performance_metrics": {
+        "f1_score": 0.7111,
+        "recall": 0.64,
+        "precision": 0.9999
+    },
+    "interpretability": {
+        "top_10_features": [
+            [
+                "amt",
+                0.23387499153614044
+            ],
+            [
+                "high_risk_time",
+                0.140356183052063
+            ],
+            [
+                "category_misc_pos",
+                0.09116844832897186
+            ],
+            [
+                "category_health_fitness",
+                0.07947885245084763
+            ],
+            [
+                "category_gas_transport",
+                0.0735400915145874
+            ],
+            [
+                "category_travel",
+                0.060290414839982986
+            ],
+            [
+                "category_food_dining",
+                0.04298814386129379
+            ],
+            [
+                "amt_to_cat_avg",
+                0.03131894767284393
+            ],
+            [
+                "gender_F",
+                0.02966066263616085
+            ],
+            [
+                "category_personal_care",
+                0.02929043397307396
+            ]
+        ]
+    },
+    "timestamp": "2026-02-22T18:25:54.847344"
+}

@@ -1,0 +1,46 @@
+graph TD
+    %% 1. Frontend Layer
+    subgraph Layer1 [Frontend Layer: Streamlit]
+        style Layer1 fill:#e1f5fe,stroke:#01579b
+        UI["<b>Streamlit UI</b>"]
+    end
+
+    UI -- "Secure Session" --> Ingestor
+
+    %% 2. Orchestration Layer
+    subgraph Chalice [AWS Chalice / Backend Orchestrator]
+        style Chalice fill:#fff3e0,stroke:#e65100
+        direction TB
+
+        subgraph S_Ingest [1. Ingestion & Pre-processing]
+            Ingestor["<b>IIngestor</b>"] --> Sanitizer["<b>ISanitizer</b>"]
+        end
+
+        subgraph S_Sec [2. Security & Audit Gate]
+            direction LR
+            Security["<b>ISecurity</b><br/>(App-Level Masking)"]
+            IAM["<b>AWS IAM</b><br/>(Access Control)"]
+            Logger["<b>ILogger</b><br/>(Audit Trail)"]
+        end
+
+        subgraph S_AI [3. AI Enrichment Logic]
+            Translator["<b>ITranslate</b>"] --> Analyzer["<b>ISentiment</b>"]
+        end
+
+        S_Ingest --> S_Sec
+        S_Sec --> S_AI
+    end
+
+    %% 3. Persistence Layer
+    subgraph Layer3 [Storage Layer: AWS Managed]
+        style Layer3 fill:#e8f5e9,stroke:#1b5e20
+        direction LR
+        DDB[("<b>DynamoDB</b><br/>(AES-256 Encrypted)")]
+        KMS["<b>AWS KMS</b><br/>(Key Management)"]
+    end
+
+    S_AI --> DDB
+    DDB -.-> KMS
+
+    %% Return Path
+    DDB -.->|"Success Ack"| UI

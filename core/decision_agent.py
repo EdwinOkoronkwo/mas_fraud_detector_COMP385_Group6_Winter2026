@@ -1,31 +1,76 @@
+import os
+
 from autogen_agentchat.agents import AssistantAgent
 
 from tools.reporting.report_tools import write_markdown_report
 
+from autogen_agentchat.agents import AssistantAgent
+from autogen_core.models import UserMessage
+from autogen_core import CancellationToken
+
+import os
+import joblib
+import json
+
+
 
 class DecisionAggregator:
-    def __init__(self, model_client, save_tool):
+    def __init__(self, model_client, settings, save_tool, tournament_results=None):
+        self.settings = settings
+
+        # 1. Capture the actual metrics from the tournament tools
+        results_context = tournament_results if tournament_results else "No results found yet."
+
+        # 2. Get the 24 features directly from the source of truth
+        feature_list = self.get_feature_list()
+
         self.agent = AssistantAgent(
             name="Decision_Aggregator",
             model_client=model_client,
-            # We combine the static report tool with the dynamic save tool
             tools=[write_markdown_report, save_tool],
-            max_tool_iterations=5,
-            reflect_on_tool_use=True,
-            system_message="""You are the Lead Risk Architect. 
+            system_message=f"""You are the Lead Risk Architect.
 
-            MISSION: 
-            1. Review all training logs to identify the 'Champion' for Supervised, Neural, and Clustering.
-            2. Generate 'FINAL_FRAUD_STRATEGY.md' with the 40/40/20 reasoning.
-            3. CRITICAL: Use 'save_inference_metadata' to create a JSON file that tells the 
-               inference script EXACTLY which saved files to load.
+            ### DATA SOURCE: DataSpecialist Bundle (.joblib)
+            ### FEATURES USED: {feature_list}
 
-            JSON REGISTRY FORMAT:
-            {
-              "supervised": {"path": "models/ann_v1.joblib", "type": "sklearn"},
-              "neural": {"path": "models/rnn_final.pth", "type": "torch"},
-              "clustering": {"path": "models/dbscan_tuned.joblib", "type": "sklearn"},
-              "weights": [0.4, 0.4, 0.2]
-            }
+            ### REAL-TIME TOURNAMENT DATA:
+            {results_context}
+
+            ### YOUR MISSION:
+            1. ANALYZE: Use the TP, Recall, and Precision from the data above.
+            2. COMPARE: Evaluate the Supervised (XGB/RF), Neuro (MLP/VAE/RNN), and Clustering (DBSCAN/K-Means) results.
+            3. CHAMPION: Pick the model with the best Recall-to-Precision balance for fraud detection.
+            4. ARCHIVE: Call 'save_tool' to move the winning artifact to 'models/production_champion'.
+            5. REPORT: Write 'FINAL_FRAUD_STRATEGY.md'. Include a table comparing the models and list the {len(feature_list)} features used.
             """
         )
+
+    def get_feature_list(self):
+        """
+        STRICT SYNC: Pulls the feature list only from the DataSpecialist bundle.
+        """
+        try:
+            # This path is defined by your DataSpecialist output
+            bundle_path = "data/temp_split.joblib"
+
+            if not os.path.exists(bundle_path):
+                raise FileNotFoundError(f"Critical Error: {bundle_path} not found. DataSpecialist must run first.")
+
+            data_bundle = joblib.load(bundle_path)
+
+            # Extract the features list stored by the Specialist
+            features = data_bundle.get('features', [])
+
+            if not features:
+                # If for some reason the list is missing, we extract from the training DataFrame columns
+                X_train, _ = data_bundle.get('train')
+                if hasattr(X_train, 'columns'):
+                    features = X_train.columns.tolist()
+                else:
+                    # If it's a NumPy array, we report the count
+                    return [f"Feature_{i}" for i in range(X_train.shape[1])]
+
+            return features
+
+        except Exception as e:
+            return f"Error retrieving feature list: {str(e)}"

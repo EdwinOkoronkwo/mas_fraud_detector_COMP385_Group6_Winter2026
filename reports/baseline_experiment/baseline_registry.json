@@ -1,0 +1,16 @@
+{
+    "model_info": {
+        "name": "xgb_baseline_static",
+        "file": "xgb_baseline.pkl",
+        "type": "xgboost.XGBClassifier",
+        "tier": "Baseline"
+    },
+    "performance": {
+        "f1_score": 0.7111,
+        "recall": 0.64
+    },
+    "metadata": {
+        "finalized_at": "2026-02-22 18:32:07",
+        "feature_count": 27
+    }
+}

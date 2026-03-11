@@ -1,0 +1,7 @@
+{
+    "supervised": 0.0001,
+    "neural": 0.8102,
+    "clustering": 0.7856,
+    "total": 0.5319,
+    "override": "None"
+}

@@ -1,0 +1,95 @@
+{
+    "model_metadata": {
+        "type": "XGBoost_Baseline_Static",
+        "library_version": "xgboost_sklearn",
+        "random_state": 42
+    },
+    "recreation_specs": {
+        "best_params": {
+            "max_depth": 5,
+            "n_estimators": 200,
+            "scale_pos_weight": 1
+        },
+        "feature_count": 27,
+        "feature_names": [
+            "amt",
+            "zip",
+            "lat",
+            "long",
+            "city_pop",
+            "unix_time",
+            "merch_lat",
+            "merch_long",
+            "category_entertainment",
+            "category_food_dining",
+            "category_gas_transport",
+            "category_grocery_net",
+            "category_grocery_pos",
+            "category_health_fitness",
+            "category_home",
+            "category_kids_pets",
+            "category_misc_net",
+            "category_misc_pos",
+            "category_personal_care",
+            "category_shopping_net",
+            "category_shopping_pos",
+            "category_travel",
+            "gender_F",
+            "gender_M",
+            "amt_to_cat_avg",
+            "high_risk_time",
+            "txn_velocity"
+        ],
+        "threshold_applied": 0.5
+    },
+    "performance_metrics": {
+        "f1_score": 0.7311,
+        "recall": 0.7016,
+        "precision": 0.9999
+    },
+    "interpretability": {
+        "top_10_features": [
+            [
+                "category_gas_transport",
+                0.21836994588375092
+            ],
+            [
+                "amt",
+                0.18059754371643066
+            ],
+            [
+                "category_grocery_pos",
+                0.120755136013031
+            ],
+            [
+                "category_grocery_net",
+                0.07283002138137817
+            ],
+            [
+                "category_personal_care",
+                0.05727647617459297
+            ],
+            [
+                "category_misc_pos",
+                0.055536795407533646
+            ],
+            [
+                "category_kids_pets",
+                0.04840822517871857
+            ],
+            [
+                "category_travel",
+                0.04580969363451004
+            ],
+            [
+                "category_health_fitness",
+                0.03738238289952278
+            ],
+            [
+                "gender_F",
+                0.03294505178928375
+            ]
+        ]
+    },
+    "timestamp": "2026-03-11T06:12:53.497350"
+}

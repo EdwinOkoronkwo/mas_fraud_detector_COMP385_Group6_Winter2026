@@ -1,0 +1,42 @@
+{
+    "model_info": {
+        "name": "champion_rf",
+        "file": "champion_rf.joblib",
+        "type": "sklearn.ensemble.RandomForestClassifier"
+    },
+    "inference_params": {
+        "threshold": 0.5,
+        "expected_features": [
+            "amt",
+            "zip",
+            "lat",
+            "long",
+            "city_pop",
+            "unix_time",
+            "merch_lat",
+            "merch_long",
+            "category_food_dining",
+            "category_gas_transport",
+            "category_grocery_net",
+            "category_grocery_pos",
+            "category_health_fitness",
+            "category_home",
+            "category_kids_pets",
+            "category_misc_net",
+            "category_misc_pos",
+            "category_personal_care",
+            "category_shopping_net",
+            "category_shopping_pos",
+            "category_travel",
+            "gender_M"
+        ]
+    },
+    "performance_at_train": {
+        "f1_score": 0.3538,
+        "recall": 0.8214,
+        "roc_auc": 0.929,
+        "train_size": 79548,
+        "test_size": 10000
+    },
+    "exported_at": "2026-02-17 12:47:29"
+}

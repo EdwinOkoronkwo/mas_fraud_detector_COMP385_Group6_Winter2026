@@ -1,50 +1,58 @@
 import autogen_agentchat.teams
 from autogen_agentchat.conditions import TextMentionTermination
-from strategies.data_preprocessing.quality_critic import get_quality_critic
+
 
 from autogen_agentchat.teams import SelectorGroupChat
 from autogen_agentchat.conditions import TextMentionTermination
 
+from strategies.data_preprocessing.quality_critic import get_quality_critic
+
 
 def prep_selector(messages):
-    """
-    Ensures a strict sequence for Ollama:
-    Ingest -> EDA -> Preprocess -> Critic
-    """
-    history = [m.source.lower() for m in messages]
+    processed_contents = []
+    for m in messages:
+        if isinstance(m.content, list):
+            processed_contents.append(str(m.content))
+        else:
+            processed_contents.append(m.content or "")
 
-    if "sql_ingestor" not in history:
+    history_text = " ".join(processed_contents).upper()
+    history_sources = [m.source.lower() for m in messages]
+
+    # 1. SQL_Ingestor -> EDA_Specialist
+    if "INGESTION_COMPLETE" not in history_text:
         return "SQL_Ingestor"
-    if "eda_specialist" not in history:
+
+    # 2. EDA_Specialist -> Feature_Engineer
+    if "eda_specialist" not in history_sources:
         return "EDA_Specialist"
-    if "preprocess_agent" not in history:
+
+    # 3. Feature_Engineer -> Preprocess_Agent
+    # The Feature_Engineer should end its turn with "ENGINEERING_COMPLETE"
+    # if "ENGINEERING_COMPLETE" not in history_text:
+    #     return "Feature_Engineer"
+
+    # 4. Preprocess_Agent -> Quality_Critic
+    if "PREPROCESS_SUCCESS" not in history_text:
         return "Preprocess_Agent"
-    # Once the main 3 are done, hand off to the Quality Critic
+
+    # 5. Final Audit
     return "Quality_Critic"
-
-
-def create_preprocessing_team(sql_ingestor, eda_specialist, preprocess_agent, model_client):
-    """
-    Assembles the data prep team using a fixed-sequence selector to prevent Ollama errors.
-    """
+def create_preprocessing_team(sql_ingestor, eda_specialist, feature_engineer, preprocess_agent, model_client):
     actual_db_path = sql_ingestor.config.get("DB_PATH")
 
-    # Initialize the Critic with a unique name for the selector
+    # The critic remains the final gatekeeper
     critic = get_quality_critic(model_client, actual_db_path)
 
-    termination = TextMentionTermination("DATA_VERIFIED")
-
-    # Change to SelectorGroupChat to use your custom selector_func
-    team = SelectorGroupChat(
+    return SelectorGroupChat(
         participants=[
             sql_ingestor.agent,
             eda_specialist.agent,
+            # feature_engineer.agent, # Added to the roster
             preprocess_agent.agent,
             critic
         ],
-        model_client=model_client,  # Required for SelectorGroupChat
+        model_client=model_client,
         selector_func=prep_selector,
-        termination_condition=termination
+        termination_condition=TextMentionTermination("DATA_VERIFIED")
     )
-
-    return team

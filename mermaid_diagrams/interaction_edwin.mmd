@@ -1,0 +1,37 @@
+sequenceDiagram
+    autonumber
+    participant UI as JS Frontend (Client)
+    participant FILE as FileReader (Data)
+    participant ORCH as app.py (Orchestrator)
+    participant FACT as TranslatorFactory
+    participant STRAT as AWS Strategy
+    participant AWS as Amazon Translate (Cloud)
+
+    Note over UI, AWS: User Refreshes Webpage (Horizontal Flow)
+
+    UI->>ORCH: GET /headlines
+    activate ORCH
+
+    ORCH->>FILE: read_headlines("headline_edwin.txt")
+    activate FILE
+    FILE-->>ORCH: List of raw strings
+    deactivate FILE
+
+    ORCH->>FACT: get_translator("AWS")
+    activate FACT
+    FACT-->>ORCH: AWSTranslator Instance
+    deactivate FACT
+
+    loop For each headline
+        ORCH->>STRAT: translate(text)
+        activate STRAT
+        STRAT->>AWS: Post Translation Request
+        AWS-->>STRAT: Translated JSON Result
+        STRAT-->>ORCH: Success or "Not Supported"
+        deactivate STRAT
+    end
+
+    ORCH-->>UI: Final Aggregated JSON Data
+    deactivate ORCH
+
+    Note over UI: JS UI_Renderer updates HTML Table

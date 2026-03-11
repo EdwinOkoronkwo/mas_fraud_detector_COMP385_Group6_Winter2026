@@ -1,0 +1,56 @@
+{
+    "metadata": {
+        "timestamp": "2026-02-21",
+        "status": "Finalized"
+    },
+    "supervised": {
+        "path": "models/champion_xgb_dynamic.pkl",
+        "type": "xgboost",
+        "metrics": {
+            "f1": 0.73,
+            "recall": 0.76
+        }
+    },
+    "unsupervised_neuro": {
+        "path": "models/champion_vae.pth",
+        "type": "variational_ae",
+        "metrics": {
+            "true_positives": 166,
+            "threshold_p": 97
+        }
+    },
+    "unsupervised_clustering": {
+        "path": "models/champion_kmeans.joblib",
+        "type": "kmeans",
+        "metrics": {
+            "silhouette": 0.2121,
+            "anomalies": 1297
+        }
+    },
+    "features_used": [
+        "num__amt",
+        "num__zip",
+        "num__lat",
+        "num__long",
+        "num__city_pop",
+        "num__unix_time",
+        "num__merch_lat",
+        "num__merch_long",
+        "cat__category_entertainment",
+        "cat__category_food_dining",
+        "cat__category_gas_transport",
+        "cat__category_grocery_net",
+        "cat__category_grocery_pos",
+        "cat__category_health_fitness",
+        "cat__category_home",
+        "cat__category_kids_pets",
+        "cat__category_misc_net",
+        "cat__category_misc_pos",
+        "cat__category_personal_care",
+        "cat__category_shopping_net",
+        "cat__category_shopping_pos",
+        "cat__category_travel",
+        "cat__gender_F",
+        "cat__gender_M"
+    ]
+}

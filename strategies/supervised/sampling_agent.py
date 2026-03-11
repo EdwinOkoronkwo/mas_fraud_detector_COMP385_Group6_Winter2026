@@ -2,7 +2,7 @@ from typing import Dict, Any
 
 from autogen_agentchat.agents import AssistantAgent
 
-from config.settings import TEMP_SPLIT_PATH
+from config.settings import settings
 from interfaces.i_data_agent import IDataAgent
 from tools.training.supervised_common_tools import prepare_championship_data_tool
 

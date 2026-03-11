@@ -6,38 +6,66 @@ from typing import Dict, Any
 
 def migrate_csv_to_sql_tool(kaggle_path: str, db_path: str, sample_frac: float = 0.1) -> str:
     """
-    Moves a 10% sample of fraud detection CSV files into a SQLite database.
+    Moves both Train and Test CSV files into a SQLite database.
     """
-    db_url = f"sqlite:///{db_path}"
-    engine = create_engine(db_url)
-
-    files = {
-        "train_transactions": os.path.join(kaggle_path, "fraudTrain.csv"),
-        "test_transactions": os.path.join(kaggle_path, "fraudTest.csv")
-    }
-
-    stats = {}
     try:
-        # 1. Ensure the directory exists (Fixes the Windows path issue)
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        engine = create_engine(f"sqlite:///{os.path.abspath(db_path)}")
+        results = []
 
-        for table, path in files.items():
-            if not os.path.exists(path):
-                return f"ERROR: File not found at {path}"
+        # List of files to look for and their corresponding table names
+        data_map = {
+            "fraudTrain.csv": "train_transactions",
+            "fraudTest.csv": "test_transactions"
+        }
 
-            # 2. Optimization: Only read 10% of the data using the sample_frac
-            # We read in chunks to keep memory usage low even during sampling
-            total = 0
-            for i, chunk in enumerate(pd.read_csv(path, chunksize=100000)):
-                # Take 10% of each chunk
-                sampled_chunk = chunk.sample(frac=sample_frac, random_state=42)
+        for csv_name, table_name in data_map.items():
+            file_path = os.path.join(kaggle_path, csv_name)
 
-                mode = 'replace' if i == 0 else 'append'
-                sampled_chunk.to_sql(table, engine, if_exists=mode, index=False)
-                total += len(sampled_chunk)
+            if os.path.exists(file_path):
+                # Read, sample, and migrate
+                df = pd.read_csv(file_path)
 
-            stats[table] = total
+                # Use a larger sample for testing to ensure we have enough fraud cases
+                current_sample = df.sample(frac=sample_frac, random_state=42)
+                current_sample.to_sql(table_name, engine, if_exists='replace', index=False)
+                results.append(f"{table_name} ({len(current_sample)} rows)")
+            else:
+                results.append(f"SKIPPED: {csv_name} not found.")
 
-        return f"SUCCESS: Migrated 10% sample: {stats['train_transactions']} train rows and {stats['test_transactions']} test rows."
+        return f"SUCCESS: Migrated {', '.join(results)}. INGESTION_COMPLETE"
     except Exception as e:
-        return f"ERROR: Migration failed: {str(e)}"
+        return f"ERROR: {str(e)}"
+
+def purge_existing_database(db_path: str):
+    """
+    Forcefully removes all tables and shrinks the database file.
+    """
+    import sqlite3
+    import os
+
+    # Resolve absolute path to avoid "wrong file" issues
+    abs_path = os.path.abspath(db_path)
+
+    try:
+        # Use a context manager to ensure the connection CLOSES
+        with sqlite3.connect(abs_path) as conn:
+            cursor = conn.cursor()
+
+            # Disable foreign key checks to allow dropping everything
+            cursor.execute("PRAGMA foreign_keys = OFF;")
+
+            # Get all table names
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            tables = [t[0] for t in cursor.fetchall() if not t[0].startswith("sqlite_")]
+
+            for table in tables:
+                cursor.execute(f"DROP TABLE IF EXISTS {table};")
+                print(f"🗑️ Dropped table: {table}")
+
+            # VACUUM cleans the database file physically
+            cursor.execute("VACUUM;")
+            conn.commit()
+
+        return f"SUCCESS: Database at {abs_path} purged and vacuumed."
+    except Exception as e:
+        return f"ERROR during purge: {str(e)}"

@@ -1,0 +1,46 @@
+%%{init: {'theme':'default', 'themeVariables': { 'background': '#ffffff'}}}%%
+
+graph TD
+    %% Start
+    Start([New Transaction Data]) --> DataHand[<b>DataHandler</b><br/>Fetch Raw Data]
+
+    %% Phase 1: Preprocessing & Behavioral Induction
+    subgraph P1 [1. Behavioral Induction & Transformation]
+        DataHand --> BI[<b>Behavioral Induction</b><br/>amt_to_cat_avg, high_risk_time, velocity]
+        BI --> Prep[<b>Preprocessor</b><br/>27-Feature Scaling]
+    end
+
+    %% Phase 2: Parallel Trinity Execution
+    subgraph P2 [2. Parallel Multi-Agent Pillars]
+        direction LR
+        Prep --> Gold[<b>Gold Pillar</b><br/>XGBoost Classifier]
+        Prep --> Neuro[<b>Neuro Pillar</b><br/>Autoencoder MSE]
+        Prep --> Cluster[<b>Cluster Pillar</b><br/>DBSCAN Distance]
+    end
+
+    %% Phase 3: Scoring Engine (Decision Fusion)
+    subgraph P3 [3. Scoring Engine & Weight Adapter]
+        Gold & Neuro & Cluster --> SE[<b>ScoringEngine</b>]
+        SE --> Logic{Logic Gates}
+        Logic --> |g_p < 0.1 & n_p > 0.8| Stealth[Stealth Override]
+        Logic --> |g_p < 0.05| Veto[Veto Protect]
+        Logic --> |Normal| Adaptive[Performance Adaptive]
+        Stealth & Veto & Adaptive --> Adapter[<b>WeightAdapter</b><br/>Update Trust Weights]
+    end
+
+    %% Phase 4: RAG Orchestration & Explanation
+    subgraph P4 [4. Agentic Audit & RAG]
+        Adapter --> Orch[<b>Orchestrator</b>]
+        Orch --> RAG[<b>RAG Agent Team</b><br/>Policy Retrieval]
+        RAG --> Expl[<b>LLM Reasoning</b><br/>Human-Readable Explanation]
+    end
+
+    %% Output
+    Expl --> Results[Final Results DataFrame]
+    Results --> End([Fraud Audit Trail])
+
+    %% Styling
+    style P1 fill:#f9f9f9,stroke:#333
+    style P2 fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    style P3 fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    style P4 fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px

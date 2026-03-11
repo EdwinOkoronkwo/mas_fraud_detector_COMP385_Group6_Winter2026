@@ -1,0 +1,86 @@
+classDiagram
+direction TB
+
+    class Main {
+        +main()
+    }
+
+    class TrainingPipeline {
+        +run_tournament()
+    }
+
+    Main --> TrainingPipeline
+
+    %% =====================
+    %% TOP LEVEL STRUCTURE
+    %% =====================
+    class Baseline_XGB {
+        +train_default_params()
+        +save_results()
+    }
+
+    class SupervisedTeam { <<Team>> }
+    class UnsupervisedTeam { <<Team>> }
+
+    TrainingPipeline --> Baseline_XGB
+    TrainingPipeline --> SupervisedTeam
+    TrainingPipeline --> UnsupervisedTeam
+
+    %% =====================
+    %% BASELINE PERSISTENCE
+    %% =====================
+    class BaselineLog {
+        <<file>>
+        baseline_results.json
+    }
+    Baseline_XGB --> BaselineLog : "Direct Save"
+
+    %% =====================
+    %% SUPERVISED BRANCH
+    %% =====================
+    class Static_XGB { +train() }
+    class Dynamic_XGB { +tune() }
+    class Supervised_Critic { +validate_metrics() }
+
+    SupervisedTeam --> Static_XGB
+    SupervisedTeam --> Dynamic_XGB
+
+    Static_XGB --> Supervised_Critic
+    Dynamic_XGB --> Supervised_Critic
+
+    %% =====================
+    %% UNSUPERVISED BRANCH
+    %% =====================
+    class Static_DBScan { +run() }
+    class Dynamic_DBScan { +tune() }
+    class Static_VAE { +reconstruct() }
+    class Dynamic_VAE { +tune() }
+    class Unsupervised_Critic { +verify_patterns() }
+
+    UnsupervisedTeam --> Static_DBScan
+    UnsupervisedTeam --> Dynamic_DBScan
+    UnsupervisedTeam --> Static_VAE
+    UnsupervisedTeam --> Dynamic_VAE
+
+    Static_DBScan --> Unsupervised_Critic
+    Dynamic_DBScan --> Unsupervised_Critic
+    Static_VAE --> Unsupervised_Critic
+    Dynamic_VAE --> Unsupervised_Critic
+
+    %% =====================
+    %% FINAL SELECTION (Tournament Only)
+    %% =====================
+    class Decision_Aggregator {
+        +rank_champions()
+        +save_to_registry()
+    }
+
+    Supervised_Critic --> Decision_Aggregator
+    Unsupervised_Critic --> Decision_Aggregator
+
+    class ChampionRegistry {
+        <<file>>
+        champion_registry.json
+    }
+
+    Decision_Aggregator --> ChampionRegistry

@@ -1,0 +1,28 @@
+classDiagram
+direction TB
+
+class StreamlitApp {
+    -AnalysisPipeline pipeline
+    +__init__(pipeline)
+    +render_ui()
+    +handle_analysis(raw_text)
+}
+
+class UIComponents {
+    <<utility>>
+    +display_header()
+    +display_results(data)
+    +display_error(message)
+}
+
+class AnalysisPipeline {
+    -IIngestor ingestor
+    -ISanitizer sanitizer
+    -ITranslateProvider translator
+    -ISentimentProvider analyzer
+    -IPersistence storage
+    +run(input_data)
+}
+
+StreamlitApp --> UIComponents : uses
+StreamlitApp --> AnalysisPipeline : composes
