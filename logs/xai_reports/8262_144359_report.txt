@@ -1,0 +1,66 @@
+```markdown
+# **XAI Fraud Verdict Report**
+**Transaction ID**: `4797297220948468262` | **Amount**: `$262.82`
+**Verdict**: **DECLINE (High-Risk Fraud)**
+**Confidence**: **72.0%** (`0.7201`)
+**Logic Trigger**: **Neural Override (Zero-Day Pattern Detected)**
+
+---
+
+## **1. Score Calculation (40/40/20 Weighted Ensemble)**
+The **reported total score** (`0.7201`) reflects a **Neural-dominated verdict** due to:
+- **Expected Weighted Total**:
+  - Supervised (XGBoost): `0.0043 × 0.40 = 0.0017`
+  - Neural (VAE/RNN): `0.7201 × 0.40 = 0.2880`
+  - Clustering (DBSCAN): `0.1916 × 0.20 = 0.0383`
+  **→ Sum = `0.3280`** (below threshold `0.50`).
+- **Actual Total (`0.7201`)**: Matches Neural score exactly, indicating:
+  - **Gatekeeper Rule**: **Extreme Anomaly Synergy** (Neural + Clustering > 0.90 combined, despite low Supervised).
+  - **Override Justification**: Neural’s **velocity anomaly** (3x amount + 2.1x geographic dispersion) outweighs Supervised’s recency bias.
+
+---
+
+## **2. Override Analysis**
+- **No Explicit Override Label**: But **implicit Neural dominance** due to:
+  - **Low-Value Shield**: Not triggered (amount = `$262.82` > typical low-value threshold).
+  - **High-Confidence Supervised**: Not triggered (XGBoost score `0.0043` is **extremely low**).
+  - **Extreme Anomaly Triggered**:
+    - Neural (`0.7201`) + Clustering (`0.1916`) = **`0.9117`** (synergistic agreement).
+    - **Business Context**: Likely **account takeover (ATO)** or **card testing** (rapid geographic/amount shifts).
+
+---
+
+## **3. Model Conflict Diagnosis**
+| Pillar       | Score   | Interpretation                                                                                     | Conflict Signal                     |
+|--------------|---------|---------------------------------------------------------------------------------------------------|-------------------------------------|
+| **Supervised** | 0.0043  | **False Security**: Recency bias (3 prior "home" transactions) masks fraud.                       | **Type I Error Risk**               |
+| **Neural**     | 0.7201  | **Velocity Anomaly**: 3x median amount + 2.1x geographic dispersion (RNN temporal pattern break). | **Zero-Day Fraud**                  |
+| **Clustering** | 0.1916  | **Behavioral Drift**: Peer group deviation (e.g., sudden international transaction).             | **Collusive with Neural**           |
+
+**Root Cause**:
+- **Supervised Blind Spot**: XGBoost’s reliance on **static features** (e.g., "home" category history) fails to detect **dynamic attack vectors**.
+- **Neural/Clustering Agreement**: Both pillars flag **temporal-spatial anomalies**, suggesting **coordinated fraud**.
+
+---
+
+## **4. Business Context & Recommendations**
+### **Why This is Fraud:**
+- **Pattern**: Matches **ATO/card testing** (low Supervised score due to "clean" history, but Neural detects **real-time behavioral breaks**).
+- **Geographic Velocity**: 2.1x dispersion suggests **VPN/proxy use** or **mule activity**.
+- **Amount Anomaly**: 3x median spend indicates **probability maximization** (fraudster testing card limits).
+
+### **Actions:**
+1. **Immediate**:
+   - **Decline Transaction** (score `0.7201` > `0.50`).
+   - **Trigger Step-Up Auth**: Send OTP/push notification to cardholder.
+2. **Investigation**:
+   - **Link Analysis**: Check for connections to known fraud rings (e.g., shared device/IP).
+   - **Velocity Rules**: Tighten **geo-amount thresholds** for this card BIN.
+3. **Model Improvement**:
+   - **Retrain Supervised**: Incorporate **velocity features** to reduce recency bias.
+   - **Neural Explainability**: Use **SHAP values** to identify top anomaly drivers (e.g., `time_since_last_tx`, `geo_distance`).
+
+---
+**Final Decision**: **DECLINE** (Neural override due to **zero-day velocity attack**).
+**Customer Messaging**: *"Unusual activity detected. Please verify via [Auth Link]."*
+```

@@ -1,0 +1,53 @@
+```markdown
+# **XAI Fraud Verdict Report**
+**Transaction ID**: `4874017206859125` | **Amount**: `$274.01`
+**Verdict**: **APPROVED** (No Fraud Detected)
+**Confidence**: **78.7%** (1 - `0.4128`)
+**Logic Trigger**: **None** (No override; standard ensemble evaluation)
+
+---
+
+## **1. Score Calculation (40/40/20 Weighted Ensemble)**
+The **total score** (`0.4128`) is derived from the weighted sum of pillar scores:
+- **Supervised (XGBoost)**: `0.0212 × 0.40 = 0.0085`
+- **Neural (VAE/RNN)**: `0.4128 × 0.40 = 0.1651`
+- **Clustering (DBSCAN)**: `0.1005 × 0.20 = 0.0201`
+**Total = `0.0085 + 0.1651 + 0.0201 = 0.1937`**
+*Correction*: The provided `total` (`0.4128`) suggests a **Neural Override** (see below).
+
+---
+
+## **2. Override Analysis**
+- **No Override Applied**: The `override` field is `"None"`, meaning:
+  - **Low-Value Shield**: Not triggered (amount > $50).
+  - **High-Confidence Supervised**: Not triggered (XGBoost score `0.0212` is low-confidence).
+  - **Extreme Anomaly**: Not triggered (Neural/Clustering scores are moderate).
+
+*Discrepancy Note*: The `total` score (`0.4128`) matches the **Neural pillar** exactly, implying a **fallback to Neural** due to:
+  - **Supervised/Clustering Disagreement**: Supervised (`0.0212`) and Clustering (`0.1005`) are low, but Neural (`0.4128`) is elevated.
+  - **Potential Zero-Day Signal**: Neural detects an anomaly not yet captured by supervised patterns.
+
+---
+
+## **3. Model Conflict Diagnosis**
+| Pillar       | Score   | Interpretation                                                                 |
+|--------------|---------|-------------------------------------------------------------------------------|
+| **Supervised** | 0.0212  | **Low Risk**: Transaction aligns with historical patterns.                   |
+| **Neural**     | 0.4128  | **Moderate Anomaly**: Unusual but not extreme (e.g., new merchant category).  |
+| **Clustering** | 0.1005  | **Minor Outlier**: Slight deviation from peer behavior (e.g., time of day).   |
+
+**Conflict**: Neural’s elevated score suggests a **novel pattern** (e.g., new fraud tactic or edge case). However:
+- **No Override**: The ensemble’s weighted total (`0.1937`) would typically fall below the threshold (`0.50`), but the reported `total` (`0.4128`) indicates a **Neural-dominated verdict**.
+- **Business Context**: Likely a **false positive** or **emerging trend** (e.g., first-time cross-border transaction).
+
+---
+
+## **4. Business Recommendations**
+- **Monitor**: Flag for **post-transaction review** if Neural scores remain elevated in similar transactions.
+- **Rule Tuning**: Adjust **Neural weight** (currently 40%) if false positives persist.
+- **Data Enrichment**: Investigate `raw_features` for **new fraud vectors** (e.g., device fingerprinting gaps).
+
+---
+**Final Decision**: **APPROVE** (Score `0.4128` < Threshold `0.50`).
+*Rationale*: Low supervised/clustering risk outweighs Neural’s moderate anomaly.
+```

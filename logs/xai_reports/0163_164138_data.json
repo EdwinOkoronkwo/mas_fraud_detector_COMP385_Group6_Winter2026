@@ -1,0 +1,7 @@
+{
+    "supervised": 0.0001,
+    "neural": 0.8567,
+    "clustering": 0.8123,
+    "total": 0.99,
+    "override": "Synergistic Extreme Anomaly"
+}

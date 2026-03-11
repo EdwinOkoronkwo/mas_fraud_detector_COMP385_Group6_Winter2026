@@ -4,8 +4,15 @@ import sqlite3
 from langchain.tools import tool
 from autogen_ext.tools.langchain import LangChainToolAdapter
 
+import joblib
+import numpy as np
+import os
+from config.settings import settings
+
 import csv
 from datetime import datetime
+
+
 
 LOG_FILE = "mas_fraud_detector/logs/inference_audit.csv"
 
@@ -61,48 +68,174 @@ import numpy as np
 
 MODEL_DIR = r"C:\Youtube\autogen\mas_fraud_detector\models"
 
+import numpy as np
+import joblib
+import os
 
-def scale_transaction_data(amount: float, hour: int, dist: float) -> dict:
+
+
+
+from typing import Union, List, Dict
+import os
+import joblib
+
+
+def prepare_full_inference_vector(raw_row: Dict, model_dir: str = "models") -> Dict:
     """
-    Handles the 9-feature requirement of the saved scaler.
-    Assumes amount, hour, and dist are the first three features.
+    Combines scaling (9 features) and one-hot encoding (12 features)
+    to create the final 21-feature vector expected by XGBoost.
     """
-    scaler = joblib.load(os.path.join(MODEL_DIR, "scaler.joblib"))
+    # 1. Load the Scaler and the Model's feature list
+    scaler = joblib.load(os.path.join(model_dir, "scaler.joblib"))
+    # In your case, this should list the 21 features the model was trained on
+    expected_21 = [
+        'amt', 'zip', 'lat', 'long', 'city_pop', 'unix_time', 'merch_lat', 'merch_long',
+        'category_entertainment', 'category_food_dining', 'category_gas_transport',
+        'category_grocery_net', 'category_grocery_pos', 'category_health_fitness',
+        'category_home', 'category_kids_pets', 'category_misc_net', 'category_misc_pos',
+        'category_personal_care', 'category_shopping_net', 'category_shopping_pos', 'category_travel'
+    ]
 
-    # 1. Create a template of 9 zeros (or the mean of your training data)
-    # This matches the shape the scaler expects
-    full_feature_row = np.zeros((1, 9))
+    # 2. Scale the 9 Numeric Features
+    numeric_cols = scaler.feature_names_in_
+    numeric_input = [float(raw_row.get(f, 0)) for f in numeric_cols]
+    scaled_values = scaler.transform([numeric_input])[0]
+    final_payload = dict(zip(numeric_cols, scaled_values))
 
-    # 2. Assign your 3 active features to their original positions
-    # (Update these indices [0, 1, 2] if they were in different columns in your CSV)
-    full_feature_row[0, 0] = amount
-    full_feature_row[0, 1] = hour
-    full_feature_row[0, 2] = dist
+    # 3. Manual One-Hot Encoding for 'category'
+    # Default all category columns to 0
+    cat_prefix = "category_"
+    current_cat = f"{cat_prefix}{raw_row.get('category', 'misc_pos')}"
 
-    # 3. Scale the full row
-    scaled_full = scaler.transform(full_feature_row)[0]
+    for col in expected_21:
+        if col.startswith(cat_prefix):
+            final_payload[col] = 1 if col == current_cat else 0
 
-    # 4. Extract only the 3 scaled values we need for our models
-    return {
-        "s_amount": float(scaled_full[0]),
-        "s_hour": float(scaled_full[1]),
-        "s_dist": float(scaled_full[2])
-    }
+    return final_payload
 
 
-def run_rf_prediction(features: list) -> str:
-    model = joblib.load(os.path.join(MODEL_DIR, "champion_rf.joblib"))
-    scaler = joblib.load(os.path.join(MODEL_DIR, "scaler.joblib"))
+def scale_transaction_data(features_input: Dict, model_dir: str = "models") -> Dict:
+    scaler_path = os.path.join(model_dir, "scaler.joblib")
+    scaler = joblib.load(scaler_path)
 
-    # 1. Convert list to numpy array
-    raw_data = np.array(features).reshape(1, -1)
+    # The order MUST match what the scaler saw during fit_transform
+    expected_columns = scaler.feature_names_in_
 
-    # 2. SCALE the data (Crucial! Raw zip/lat will break the model)
-    scaled_data = scaler.transform(raw_data)
+    # 1. Map raw input to the OHE columns (Category/Gender)
+    # This prepares the 'raw' 21-feature row
+    raw_row = {}
+    active_cat = f"category_{features_input.get('category', 'misc_pos')}"
+    active_gender = f"gender_{features_input.get('gender', 'M')}"
 
-    # 3. Predict
-    prob = float(model.predict_proba(scaled_data)[0][1])
-    return f"RF_SCORE: {prob:.4f}"
+    for col in expected_columns:
+        if col in features_input:
+            raw_row[col] = float(features_input[col])
+        elif col == active_cat or col == active_gender:
+            raw_row[col] = 1.0
+        else:
+            raw_row[col] = 0.0
+
+    # 2. Convert to the exact list/order required
+    ordered_values = [raw_row[col] for col in expected_columns]
+
+    # 3. Scale EVERYTHING (The scaler now handles the 0/1s too)
+    # This ensures the dimensions match (21 in -> 21 out)
+    scaled_values = scaler.transform([ordered_values])[0]
+
+    # 4. Return as a dictionary for the Agents to read
+    return dict(zip(expected_columns, scaled_values))
+
+
+
+
+#
+import os
+import joblib
+import numpy as np
+
+# Set your model directory path here
+MODEL_DIR = "models"
+
+
+
+
+import json
+import os
+import joblib
+import torch
+import numpy as np
+
+import os
+import json
+
+
+def load_champion_registry():
+    # This gets the directory where rag_tools.py actually lives
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Go up levels if 'models' is in the project root and this script is in 'rag/tools/'
+    # Assuming structure: mas_fraud_detector/models/champion_registry.json
+    project_root = os.path.abspath(os.path.join(current_dir, "../.."))
+
+    registry_path = os.path.join(project_root, "models", "champion_registry.json")
+
+    print(f"🔍 Attempting to load registry from: {registry_path}")
+
+    if not os.path.exists(registry_path):
+        # Fallback: Create a dummy registry if it's missing to prevent crashing
+        return {"champions": {}, "ensemble_weights": {}}
+
+    with open(registry_path, "r") as f:
+        return json.load(f)
+
+
+REGISTRY = load_champion_registry()
+CHAMPIONS = REGISTRY.get("champions", {})
+WEIGHTS = REGISTRY.get("ensemble_weights", {})
+
+
+import torch
+import torch.nn as nn
+
+
+# 1. VAE Class Definition (Must match your training architecture)
+class VAE(nn.Module):
+    def __init__(self, input_dim=22, latent_dim=8):  # Use 22 to match the training truth
+        super(VAE, self).__init__()
+        self.encoder = nn.Sequential(
+            nn.Linear(input_dim, 20),
+            nn.ReLU(),
+            nn.Linear(20, 12),
+            # The middle layers (20 and 12) are internal,
+            # so they stay the same as long as they match your .pth file structure.
+            nn.ReLU()
+        )
+
+        # This matches the [8, 12] shape from your earlier error log
+        self.fc_mu = nn.Linear(12, latent_dim)
+        self.fc_logvar = nn.Linear(12, latent_dim)
+
+        self.decoder = nn.Sequential(
+            nn.Linear(latent_dim, 12),
+            nn.ReLU(),
+            nn.Linear(12, 20),
+            nn.ReLU(),
+            nn.Linear(20, input_dim)  # Final layer must output 22 to match input
+        )
+
+    def reparameterize(self, mu, logvar):
+        std = torch.exp(0.5 * logvar)
+        eps = torch.randn_like(std)
+        return mu + eps * std
+
+    def forward(self, x):
+        h = self.encoder(x)
+        mu, logvar = self.fc_mu(h), self.fc_logvar(h)
+        z = self.reparameterize(mu, logvar)
+        return self.decoder(z), mu, logvar
+
+
+# 2. VAE Prediction Function
 
 import torch
 import torch.nn as nn
@@ -130,75 +263,425 @@ class Residual_LSTM_AE(nn.Module):
         # CRITICAL: Must match training architecture
         return out4 + x
 
-# 2. Update the Prediction Function
-def run_rnn_prediction(features: list) -> str:
-    """Neural Pillar (40%): Calibrated Residual LSTM-AE."""
-    MODEL_PATH = os.path.join(MODEL_DIR, "champion_rnn_ae.pth")
-    SCALER_PATH = os.path.join(MODEL_DIR, "scaler.joblib")
+
+def predict_baseline_shadow(scaled_data: dict) -> float:
+    """
+    Executes the manual XGB baseline for comparative reporting.
+    This model represents the 'pre-AI' state of the project.
+    """
+    try:
+        # 1. Load the manual baseline model
+        # Path: models/baselines/manual_xgb_baseline.pkl
+        model_path = os.path.join(settings.PROJECT_ROOT, "models", "baselines", "manual_xgb_baseline.pkl")
+        model = joblib.load(model_path)
+
+        # 2. Extract features in the EXACT order expected by the baseline
+        # Even if the baseline only uses a subset, we align to its 'feature_names_in_'
+        expected_cols = getattr(model, 'feature_names_in_', [
+            "amt", "zip", "lat", "long", "city_pop", "merch_lat", "merch_long"
+        ])
+
+        # 3. Prepare the row
+        input_row = np.array([[scaled_data.get(f, 0.0) for f in expected_cols]])
+
+        # 4. Return probability
+        # Using predict_proba for consistency with the other pillars
+        return float(model.predict_proba(input_row)[0][1])
+    except Exception as e:
+        print(f"⚠️ Baseline Shadow failed: {e}")
+        return 0.0
+
+
+
+
+def predict_neural_pillar(scaled_data: dict) -> float:
+    path = CHAMPIONS["neural"]
+
+    # FIX: Get order from manifest (or hardcoded 21 list we verified)
+    expected_order = [
+        "amt", "zip", "lat", "long", "city_pop", "merch_lat", "merch_long",
+        "category_food_dining", "category_gas_transport", "category_grocery_net",
+        "category_grocery_pos", "category_health_fitness", "category_home",
+        "category_kids_pets", "category_misc_net", "category_misc_pos",
+        "category_personal_care", "category_shopping_net", "category_shopping_pos",
+        "category_travel", "gender_M"
+    ]
+
+    # Explicitly map the values in order
+    vals = [scaled_data[f] for f in expected_order]
+    tensor = torch.tensor(vals, dtype=torch.float32).unsqueeze(0)
+
+    # Load model (Dynamic selection based on path)
+    if "vae" in path.lower():
+        model = VAE(input_dim=len(vals))
+        tensor_in = tensor
+    else:
+        model = Residual_LSTM_AE(in_dim=len(vals))
+        tensor_in = tensor.unsqueeze(1)  # RNN Dim
+
+    model.load_state_dict(torch.load(path, weights_only=True))
+    model.eval()
+
+    with torch.no_grad():
+        if "vae" in path.lower():
+            recon, mu, logvar = model(tensor) # VAE returns tuple
+            mse = torch.mean((tensor - recon) ** 2).item()
+        else:
+            recon = model(tensor.unsqueeze(1))
+            mse = torch.mean((tensor.unsqueeze(1) - recon) ** 2).item()
+
+    # Probability Mapping
+    threshold = 0.75 # Adjust based on your manifest's threshold_mse
+    return float(mse)
+
+
+def predict_clustering_pillar(scaled_data: dict) -> float:
+    model = joblib.load(CHAMPIONS["clustering"])
+
+    # FIX: Use explicit order
+    expected_order = [
+        "amt", "zip", "lat", "long", "city_pop", "merch_lat", "merch_long",
+        "category_food_dining", "category_gas_transport", "category_grocery_net",
+        "category_grocery_pos", "category_health_fitness", "category_home",
+        "category_kids_pets", "category_misc_net", "category_misc_pos",
+        "category_personal_care", "category_shopping_net", "category_shopping_pos",
+        "category_travel", "gender_M"
+    ]
+    input_row = np.array([[scaled_data[f] for f in expected_order]])
+
+    # If K-Means: Use transform to get distance to centroids
+    if hasattr(model, 'transform'):
+        distances = model.transform(input_row)
+        return float(np.min(distances))  # Return the REAL distance
+
+    return 0.0
+
+
+def predict_neural_pillar_raw(scaled_data: dict) -> float:
+    print("\n🧠 [LOG] Starting Neural Pillar Raw Prediction...")
+    path = CHAMPIONS["neural"]
+
+    # 1. THE BRIDGE: Define the exact 12 features the .pth file expects
+    VAE_12_FEATURES = [
+        "amt", "zip", "lat", "long", "city_pop", "unix_time",
+        "merch_lat", "merch_long", "category_food_dining",
+        "category_gas_transport", "category_grocery_net", "gender_M"
+    ]
 
     try:
-        model = Residual_LSTM_AE(in_dim=9)
-        model.load_state_dict(torch.load(MODEL_PATH, weights_only=True))
+        # 2. Extract only these 12 from the 22-feature payload
+        vals = [scaled_data[f] for f in VAE_12_FEATURES]
+        tensor = torch.tensor(vals, dtype=torch.float32).unsqueeze(0)
+        print(f"📊 [LOG] Neural Input Tensor Shape: {tensor.shape} (Bridged 22 -> 12)")
+    except KeyError as e:
+        print(f"❌ [ERROR] Neural missing expected feature: {e}")
+        return 0.0
+
+    # 3. INITIALIZE WITH CHECKPOINT GEOMETRY
+    # We use the inference class that matches the [8, 12] checkpoint
+    model = VAE(input_dim=12, latent_dim=8)
+
+    try:
+        model.load_state_dict(torch.load(path, weights_only=True))
+        model.eval()
+    except Exception as e:
+        print(f"❌ [ERROR] State Dict Load Failed: {e}")
+        return 0.0
+
+    with torch.no_grad():
+        recon, mu, logvar = model(tensor)
+        mse = torch.mean((tensor - recon) ** 2).item()
+
+    print(f"✅ [SUCCESS] Neural Reconstruction Error (MSE): {mse:.6f}")
+    return float(mse)
+
+
+def predict_supervised_pillar(scaled_data: dict) -> float:
+    # ... Use the 9-feature Bridge ...
+    # Features: ['amt', 'zip', 'lat', 'long', 'city_pop', 'unix_time', 'merch_lat', 'merch_long', 'gender_M']
+    print("\n⚔️ [LOG] Starting Supervised Pillar Prediction...")
+    model = joblib.load(CHAMPIONS["supervised"])
+    scaler = joblib.load(os.path.join(settings.PROJECT_ROOT, "models", "scaler.joblib"))
+
+    # Trust the scaler's order implicitly
+    expected_order = list(scaler.feature_names_in_)
+
+    try:
+        # Construct vector based on the EXACT order used during training
+        # Inside your tool file:
+        OLD_9_FEATURES = ["amt", "zip", "lat", "long", "city_pop", "unix_time", "merch_lat", "merch_long", "gender_M"]
+        input_row = np.array([[scaled_data[f] for f in OLD_9_FEATURES]])
+        print(f"🧪 [LOG] Input Vector Shape: {input_row.shape} (Matches expected {len(expected_order)})")
+    except KeyError as e:
+        print(f"❌ [ERROR] Missing feature in Agent Payload: {e}")
+        # This will trigger if the Agent filters the dictionary
+        return 0.0
+
+    probs = model.predict_proba(input_row)[0]
+    return float(probs[1])
+
+
+
+
+def predict_clustering_pillar_raw(scaled_data: dict) -> float:
+    print("\n🔍 [LOG] Starting Clustering Pillar Raw Prediction...")
+
+    # 1. Load Model & Scaler
+    model = joblib.load(CHAMPIONS["clustering"])
+    scaler_path = os.path.join("models", "scaler.joblib")
+    scaler = joblib.load(scaler_path)
+
+    # 2. Get the expected order from the scaler
+    expected_order = scaler.feature_names_in_
+    print(f"📊 [LOG] Model expects {len(expected_order)} features.")
+
+    # 3. Construct input and check for missing keys
+    try:
+        # LOG: Check if any expected keys are missing from the input data
+        missing = [f for f in expected_order if f not in scaled_data]
+        if missing:
+            print(f"❌ [ERROR] Missing features in input: {missing}")
+            return 0.0
+
+        input_row = np.array([[scaled_data[f] for f in expected_order]])
+
+        # LOG: See the actual values being fed in (Truncated for readability)
+        print(f"🧪 [LOG] Raw Input Vector (First 5): {input_row[0][:5]}")
+
+    except Exception as e:
+        print(f"❌ [ERROR] Construction failed: {e}")
+        return 0.0
+
+    # 4. Calculate Distance
+    if hasattr(model, 'transform'):
+        distances = model.transform(input_row)
+        min_dist = float(np.min(distances))
+
+        # LOG: The final result
+        print(f"✅ [SUCCESS] Nearest Cluster Distance: {min_dist:.4f}")
+        return min_dist
+
+    print("⚠️ [WARNING] Model does not have 'transform' attribute.")
+    return 0.0
+
+import json
+
+
+def run_baseline_prediction(feature_dict: dict) -> str:
+    """
+    Independent Baseline Prediction.
+    Loads the config we saved to ensure column alignment.
+    """
+    BASE_DIR = "results/baseline_experiment"
+    CONFIG_PATH = os.path.join(BASE_DIR, "inference_config.json")
+
+    try:
+        # 1. Load the Map (The JSON we just made)
+        with open(CONFIG_PATH, 'r') as f:
+            config = json.load(f)
+
+        # 2. Load the Model
+        model_path = os.path.join(BASE_DIR, config["model_info"]["file"])
+        model = joblib.load(model_path)
+
+        # 3. Align Data (The "Magic" Step)
+        # Convert the raw dictionary to a DataFrame using the EXACT order from training
+        df = pd.DataFrame([feature_dict])
+        ordered_df = df[config["inference_params"]["expected_features"]]
+
+        # 4. Predict
+        prob = float(model.predict_proba(ordered_df)[0][1])
+
+        return f"BASELINE_XGB_SCORE: {prob:.4f}"
+
+    except Exception as e:
+        return f"BASELINE_ERROR: {str(e)}"
+
+import os
+from datetime import datetime
+
+
+def build_audit_report(final_score: float, status: str, mode: str, s_score: float, n_score: float,
+                       c_score: float) -> str:
+    """
+    Generates a professional Markdown-formatted audit report for the ensemble decision.
+    """
+    # 1. Visual indicator for the risk level
+    severity_emoji = "🔴" if status == "CRITICAL" else "🟡" if status == "HIGH" else "🟢"
+
+    # 2. Extract Model Names Safely
+    # This handles paths like 'models/champion_xgb.joblib' or 'models/rnn_v2.pth'
+    def _clean_name(key):
+        path = CHAMPIONS.get(key, "Unknown")
+        return os.path.basename(path).replace('champion_', '').split('.')[0].upper()
+
+    # 3. Use standard Python datetime (os.popen('date') is slow and OS-dependent)
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    report = f"""
+### {severity_emoji} FRAUD AUDIT REPORT: {status}
+---
+**FINAL AGGREGATED RISK SCORE:** `{final_score:.4f}`
+**CALCULATION STRATEGY:** `{mode}`
+
+| Pillar | Model Type | Contribution Score |
+| :--- | :--- | :--- |
+| **Supervised** | {_clean_name('supervised')} | {s_score:.4f} |
+| **Neuro-Pattern** | {_clean_name('neural')} | {n_score:.4f} |
+| **Clustering** | {_clean_name('clustering')} | {c_score:.4f} |
+
+---
+**DECISION SUMMARY:**
+The system determined a **{status}** risk level. This calculation was performed using the **{mode}** logic, ensuring that high-confidence individual model "screams" (Consensus Overrides) or high-value transaction bypasses were accounted for.
+
+*Timestamp: {timestamp}*
+"""
+    return report
+
+
+def build_audit_report_with_baseline(final_score, status, mode, s_s, n_s, c_s, b_s):
+    # Calculate Variance: How much better is the Ensemble than the Baseline?
+    improvement = (final_score - b_s) * 100
+
+    report = f"""
+### 📊 ENSEMBLE VS. BASELINE COMPARISON
+| Metric | Score | Performance Status |
+| :--- | :--- | :--- |
+| **Advanced AI Ensemble** | `{final_score:.4f}` | {status} |
+| **Manual XGB Baseline** | `{b_s:.4f}` | REFERENCE |
+| **Ensemble Variance** | `{improvement:+.2f}%` | {"🚀 LEAD" if improvement > 0 else "⚠️ UNDER"} |
+
+---
+**PILLAR BREAKDOWN:**
+* **Supervised:** {s_s:.4f}
+* **Neural:** {n_s:.4f}
+* **Clustering:** {c_s:.4f}
+"""
+    return report
+
+
+
+import pandas as pd
+import numpy as np
+
+import torch
+import numpy as np
+import joblib
+
+# Configuration derived from your training logs
+VAE_GEOMETRY = {"input": 22, "latent": 8}
+RF_FEATURES = ["amt", "zip", "lat", "long", "city_pop", "unix_time", "merch_lat", "merch_long", "gender_M"]
+
+
+def execute_champion_ensemble(scaled_data: dict, raw_features: list):
+    """
+    Finalized Ensemble: Maps 22 features to VAE/DBSCAN and bridges 9 features to RF.
+    """
+    results = {"supervised": 0.0, "neural": 0.0, "clustering": 0.0, "total": 0.0}
+
+    # 1. Prepare Vectors
+    # Full 22-feature list in training order
+    full_vector = np.array([[v for k, v in scaled_data.items()]]).astype(np.float32)
+
+    # Bridged 9-feature list for the older RF model
+    rf_vector = np.array([[scaled_data[f] for f in RF_FEATURES]])
+
+    # --- PILLAR 1: SUPERVISED (RF) ---
+    try:
+        rf_model = joblib.load("models/champion_rf.joblib")
+        results["supervised"] = float(rf_model.predict_proba(rf_vector)[0][1])
+    except Exception as e:
+        print(f"⚠️ RF Pillar Error: {e}")
+
+    # --- PILLAR 2: NEURAL (VAE) ---
+    try:
+        # Initializing with the [8, 12] geometry found in your checkpoint
+        model = VAE(input_dim=VAE_GEOMETRY["input"], latent_dim=VAE_GEOMETRY["latent"])
+        model.load_state_dict(torch.load("models/champion_vae.pth", weights_only=True))
         model.eval()
 
-        scaler = joblib.load(SCALER_PATH)
-        scaled_features = scaler.transform(np.array(features).reshape(1, -1))
-        input_tensor = torch.tensor(scaled_features, dtype=torch.float32).unsqueeze(1)
-
         with torch.no_grad():
-            reconstruction = model(input_tensor)
-            mse_value = torch.mean((input_tensor - reconstruction) ** 2).item()
-
-        # CALIBRATION: Increased to 0.15 to stop over-flagging normal noise
-        training_threshold = 0.15
-        prob = 1.0 - np.exp(-mse_value / training_threshold)
-
-        return f"RNN_SCORE: {prob:.4f} (MSE: {mse_value:.6f})"
+            tensor_in = torch.from_numpy(full_vector)
+            recon, mu, logvar = model(tensor_in)
+            # MSE as a proxy for anomaly score
+            results["neural"] = float(torch.mean((tensor_in - recon) ** 2).item())
     except Exception as e:
-        return f"RNN_PREDICTION_ERROR: {str(e)}"
+        print(f"⚠️ VAE Pillar Error: {e}")
 
-
-def run_dbscan_prediction(features: list) -> str:
-    """Clustering Pillar (20%): DBSCAN Distance in 9D Space"""
-    model = joblib.load(os.path.join(MODEL_DIR, "champion_dbscan.joblib"))
-    SCALER_PATH = os.path.join(MODEL_DIR, "scaler.joblib")
-
-    # 1. Scale the input
-    scaler = joblib.load(SCALER_PATH)
-    raw_array = np.array(features).reshape(1, -1)
-    scaled_features = scaler.transform(raw_array)
-
-    # 2. Calculate distance to the nearest "Normal" cluster core point
-    from sklearn.neighbors import NearestNeighbors
-    # We fit the components of the trained DBSCAN model
-    nn = NearestNeighbors(n_neighbors=1).fit(model.components_)
-    distances, _ = nn.kneighbors(scaled_features)
-    dist = distances[0][0]
-
-    # Normalize distance to a 0.0 - 1.0 score
-    # Change this line in run_dbscan_prediction:
-    sensitivity_factor = 0.5
-    actual_score = 1.0 - np.exp(-dist / (model.eps * sensitivity_factor))
-    return f"DBSCAN_SCORE: {actual_score:.4f}"
-
-def run_lr_prediction(features: list) -> str:
-    """Logistic Regression prediction for the Supervised Pillar."""
+    # --- PILLAR 3: CLUSTERING (DBSCAN) ---
     try:
-        # Load the Logistic Regression champion and the scaler
-        model = joblib.load(os.path.join(MODEL_DIR, "champion_lr.joblib"))
-        scaler = joblib.load(os.path.join(MODEL_DIR, "scaler.joblib"))
-
-        # 1. Convert list to numpy array and reshape for a single sample
-        raw_data = np.array(features).reshape(1, -1)
-
-        # 2. Scale the data (Consistency with training is key)
-        scaled_data = scaler.transform(raw_data)
-
-        # 3. Predict probability of class 1 (Fraud)
-        prob = float(model.predict_proba(scaled_data)[0][1])
-        return f"LR_SCORE: {prob:.4f}"
+        dbscan = joblib.load("models/champion_dbscan.joblib")
+        # Since DBSCAN doesn't 'predict', we calculate distance to the training set
+        # For simplicity in this ensemble, we check if it was a noise point (-1)
+        # or calculate a distance-based anomaly score
+        core_samples = dbscan.components_
+        dist = np.min(np.linalg.norm(core_samples - full_vector, axis=1))
+        results["clustering"] = float(np.tanh(dist))  # Squish distance to 0-1 range
     except Exception as e:
-        return f"LR_ERROR: {str(e)}"
+        print(f"⚠️ DBSCAN Pillar Error: {e}")
+
+    # Final Weighted Total (40/40/20)
+    results["total"] = (results["supervised"] * 0.4) + \
+                       (results["neural"] * 0.4) + \
+                       (results["clustering"] * 0.2)
+
+    return results
+
+
+import re
+import math
+
+
+def sigmoid(x):
+    # Subtracting 2 or 3 shifts the curve so a raw value of 1 doesn't jump to 0.7
+    return 1 / (1 + math.exp(-(x - 3)))
+
+def calibrate_score(raw_val, threshold=1.0):
+    """
+    Smoothly maps raw anomaly scores (MSE/Distance) to a 0-1 probability.
+    Values below threshold stay low; values above scale logarithmically.
+    """
+    if raw_val <= threshold:
+        # Map 0 -> threshold linearly to 0 -> 0.5
+        # This gives the 'benefit of the doubt' to low-error transactions
+        return (raw_val / threshold) * 0.5
+    else:
+        # Map values above threshold to 0.5 -> 1.0
+        # math.log1p(x) is ln(1+x), great for squashing outliers
+        scaled = 0.5 + (math.log1p(raw_val - threshold) / 5.0)
+        return min(0.99, scaled) # Cap at 0.99 to keep it realistic
+
+
+import re
+
+
+def extract_detailed_scores(text: str, cc_last4: str = None):
+    scores = {}
+    mapping = {
+        "supervised": r"(?:LR|Supervised)",
+        "neural": r"(?:RNN|Neural|VAE)",
+        "clustering": r"(?:DB|Clustering|DBSCAN)",
+        "total": r"TOTAL"
+    }
+
+    for key, pattern in mapping.items():
+        # Refined regex: matches numbers like 0.87, .87, or 87
+        # Skips decorative dots or brackets
+        regex = rf"{pattern}.*?(\d*\.?\d+)"
+        match = re.search(regex, text, re.IGNORECASE)
+
+        if match:
+            try:
+                val = match.group(1)
+                scores[key] = float(val)
+            except ValueError:
+                # This specifically catches the '.' error you just saw
+                raise ValueError(
+                    f"❌ FLOAT CONVERSION ERROR: Found '{val}' for {key} in CC {cc_last4}. Text context: ...{text[-200:]}")
+        else:
+            raise ValueError(f"❌ MISSING SCORE: Could not find {key} in Agent output for CC {cc_last4}.")
+
+    return scores
 
 import os
 from autogen_core.tools import FunctionTool
@@ -224,282 +707,5 @@ def save_report_to_disk(filename: str, content: str) -> str:
 publisher_tool = FunctionTool(
     save_report_to_disk,
     name="save_report_to_disk",
-    description="Saves the final fraud report to a local markdown file."
+    description="Saves the final fraud report. Filename must include .md extension."
 )
-
-#
-# def calculate_model_based_ensemble(s_amount: float, s_hour: float, s_dist: float) -> str:
-#     """
-#     Executes the 40/40/20 ensemble (LR, RNN, DBSCAN) and returns a weighted score.
-#     """
-#     # Create the feature list expected by the models
-#     features = [s_amount, s_hour, s_dist]
-#
-#     # 1. Get raw outputs from your "Best in Class" winners
-#     lr_res = run_lr_prediction(features)
-#     rnn_res = run_rnn_prediction(features)
-#     db_res = run_dbscan_prediction(features)
-#
-#     # 2. Extract numeric scores with error handling
-#     try:
-#         # Parse "LR_SCORE: 0.8333"
-#         lr_score = float(lr_res.split(": ")[1])
-#
-#         # Parse "RNN_SCORE: 0.3885 (MSE)" -> extract 0.3885
-#         # Note: In your strategy, RNN score is usually (1 - MSE) or a normalized anomaly score
-#         rnn_raw_mse = float(rnn_res.split(": ")[1].split(" ")[0])
-#         # Normalizing RNN: Lower MSE = Lower Fraud. We use a simple inversion or raw MSE depending on your RNN tool's output
-#         rnn_score = rnn_raw_mse
-#
-#         # Parse "DBSCAN_SCORE: 1.0" (1 for anomaly, 0 for normal)
-#         db_score = float(db_res.split(": ")[1])
-#
-#     except Exception as e:
-#         return f"Ensemble Error: Failed to parse model outputs. {str(e)}"
-#
-#     # 3. Apply the 40/40/20 Weighted Ensemble logic
-#     # LR (40%) + RNN (40%) + DBSCAN (20%)
-#     final_score = (lr_score * 0.4) + (rnn_score * 0.4) + (db_score * 0.2)
-#
-#     # Determine Risk Status
-#     status = "CRITICAL" if final_score > 0.8 else "HIGH" if final_score > 0.5 else "LOW"
-#
-#     report = (
-#         f"--- FINAL BEST-IN-CLASS ENSEMBLE REPORT ---\n"
-#         f"Supervised (Logistic Regression): {lr_score:.4f}\n"
-#         f"Neural (RNN Autoencoder MSE):    {rnn_score:.4f}\n"
-#         f"Clustering (DBSCAN Outlier):     {db_score:.4f}\n"
-#         f"-------------------------------------------\n"
-#         f"COMBINED ENSEMBLE SCORE:         {final_score:.4f}\n"
-#         f"RISK LEVEL:                      {status}\n"
-#     )
-#
-#     # Log to your MAS system
-#     if 'log_inference_event' in globals():
-#         log_inference_event("FINAL_ENSEMBLE_AGGREGATION", {"final_score": final_score, "status": status})
-#
-#     return report
-
-
-
-
-
-
-
-from typing import List
-
-# This function is now the 'Core Logic'.
-# The Pydantic EnsembleInput class handles the 'Alice Fix' and validation before this runs.
-
-def execute_champion_ensemble(features: list) -> dict:
-    """
-    CLEANED: Unified entry point for raw model execution only.
-    Returns a dictionary of raw scores for the Gatekeeper to process.
-    """
-    try:
-        # DATA INTEGRITY: Clean the CC float representation
-        features[0] = int(round(float(features[0])))
-        amt = float(features[1])
-
-        # RUN PREDICTIONS (Parallel in logic, sequential in execution)
-        lr_res = run_lr_prediction(features)
-        rnn_res = run_rnn_prediction(features)
-        db_res = run_dbscan_prediction(features)
-
-        # PARSE SCORES
-        def _parse(res):
-            return float(res.split(": ")[1].split(" ")[0])
-
-        return {
-            "lr": _parse(lr_res),
-            "rnn": _parse(rnn_res),
-            "db": _parse(db_res),
-            "amt": amt,
-            "cc_num": str(features[0])
-        }
-
-    except Exception as e:
-        print(f"❌ EXECUTION ERROR: {str(e)}")
-        return {"lr": 0.0, "rnn": 0.0, "db": 0.0, "amt": 0.0, "error": str(e)}
-
-# def execute_champion_ensemble(features: list) -> str:
-#     """
-#     Unified entry point for LR, RNN, and DBSCAN.
-#     Updated with Adaptive High-Value Weighting (60/20/20) and Screamer Logic.
-#     """
-#     try:
-#         # 1. DATA INTEGRITY: Clean the CC float representation
-#         raw_cc_float = float(features[0])
-#         clean_cc_int = int(round(raw_cc_float))
-#         features[0] = clean_cc_int
-#         clean_cc_str = str(clean_cc_int)
-#
-#         amt = float(features[1])
-#
-#         # 2. RUN PREDICTIONS
-#         lr_res = run_lr_prediction(features)
-#         rnn_res = run_rnn_prediction(features)
-#         db_res = run_dbscan_prediction(features)
-#
-#         # 3. PARSE SCORES
-#         def _parse(res):
-#             return float(res.split(": ")[1].split(" ")[0])
-#
-#         lr_s = _parse(lr_res)
-#         rnn_s = _parse(rnn_res)
-#         db_s = _parse(db_res)
-#
-#         # 4. ADAPTIVE ENSEMBLE LOGIC
-#         # Threshold-based weighting shift
-#         if amt > 1000:
-#             # High-Value Mode: Prioritize Sequence (RNN)
-#             weighted_avg = (rnn_s * 0.6) + (lr_s * 0.2) + (db_s * 0.2)
-#             mode_label = "HIGH-VALUE (RNN PRIORITIZED)"
-#         else:
-#             # Standard Mode: 40/40/20
-#             weighted_avg = (rnn_s * 0.4) + (lr_s * 0.4) + (db_s * 0.2)
-#             mode_label = "STANDARD"
-#
-#         highest_score = max(lr_s, rnn_s, db_s)
-#
-#         # RULE 1: THE SCREAMER (If any model is > 0.90 sure, don't let the average dilute it)
-#         if highest_score > 0.90:
-#             final_score = max(weighted_avg, highest_score * 0.95)
-#
-#         # RULE 2: THE CONSENSUS (Mid-tier fraud protection)
-#         elif amt > 200 and sum(1 for s in [lr_s, rnn_s, db_s] if s > 0.35) >= 2:
-#             final_score = max(weighted_avg, 0.51)
-#
-#         else:
-#             final_score = weighted_avg
-#
-#         # 5. STRUCTURED OUTPUT
-#         output_for_agent = f"""TOTAL RISK SCORE: {final_score:.4f}
-# CALCULATION MODE: {mode_label}
-#
-# DETAILED MODEL BREAKDOWN:
-# - Supervised (LR): {lr_s:.4f}
-# - Neural (RNN): {rnn_s:.4f}
-# - Clustering (DBSCAN): {db_s:.4f}
-#
-# INPUT DATA AUDIT:
-# - CC_NUM: {clean_cc_str}
-# - AMOUNT: ${amt:.2f}
-# - UNIX_TIME: {int(features[6])}
-#
-# FINAL_SCORES: LR: {lr_s:.4f}, RNN: {rnn_s:.4f}, DB: {db_s:.4f}, TOTAL: {final_score:.4f}
-# """
-#         print(f"✅ CALCULATION UPDATED [{mode_label}]: {final_score:.4f}")
-#         return output_for_agent
-#
-#     except Exception as e:
-#         print(f"❌ ENSEMBLE ERROR: {str(e)}")
-#         return f"TOTAL RISK SCORE: 0.9999 (INFERENCE_FAILED: {str(e)})"
-
-
-
-
-
-import re
-
-def extract_detailed_scores(text):
-    # Initialize with 'lr' as the primary supervised key
-    scores = {"lr": 0.0, "rnn": 0.0, "db": 0.0, "Total": 0.0}
-
-    # 1. PRIORITY: Enhanced Footer Match
-    # This pattern is now 'label-blind' for the first score to handle RF/LR/Supervised mixups
-    footer = re.search(
-        r"FINAL_SCORES:.*?(?:RF|LR|Supervised):?\s*([\d.]+).*?RNN:?\s*([\d.]+).*?DB:?\s*([\d.]+).*?TOTAL:?\s*([\d.]+)",
-        text, re.I | re.S
-    )
-
-    if footer:
-        # We map the first capture group (RF or LR) into our 'lr' key
-        scores["lr"], scores["rnn"], scores["db"], scores["Total"] = map(float, footer.groups())
-        print(f"DEBUG: ✅ Footer Match (Label Agnostic): {scores}")
-        return scores
-
-    # 2. FALLBACK: Scavenger with Dual-Label Support
-    patterns = {
-        "lr": r"(?:LR|RF|Logistic|Supervised).*?(0\.\d{1,4}|1\.0+)", # Catches both
-        "rnn": r"(?:RNN|Neural|Sequence).*?(0\.\d{1,4}|1\.0+)",
-        "db": r"(?:DB|DBSCAN|Clustering).*?(0\.\d{1,4}|1\.0+)",
-        "Total": r"(?:TOTAL|AI Score|Final Risk Score).*?(0\.\d{1,4}|1\.0+)"
-    }
-
-    for key, pat in patterns.items():
-        m = re.search(pat, text, re.IGNORECASE)
-        if m:
-            scores[key] = float(m.group(1))
-
-    print(f"DEBUG: 🔍 Scavenger Match (Updated Filter): {scores}")
-    return scores
-
-
-def execute_unified_ensemble(features: list, is_simplified: bool = False) -> str:
-    """
-    Consolidated Fraud Engine.
-    Handles both the full 9-feature vector and simplified 3-feature sets.
-    Applies the 'Screamer Rule' and 'High-Value Consensus' logic.
-    """
-    try:
-        # 1. DATA INTEGRITY & CLEANING
-        # If it's the full vector, clean the CC float representation
-        if len(features) >= 9:
-            raw_cc_float = float(features[0])
-            clean_cc_int = int(round(raw_cc_float))
-            features[0] = clean_cc_int
-            cc_display = str(clean_cc_int)[-4:]  # Last 4 for reporting
-        else:
-            cc_display = "INTERNAL"
-
-        amt = float(features[1]) if len(features) > 1 else float(features[0])
-
-        # 2. UNIFIED INFERENCE
-        lr_res = run_lr_prediction(features)
-        rnn_res = run_rnn_prediction(features)
-        db_res = run_dbscan_prediction(features)
-
-        # 3. ROBUST PARSING
-        def parse_score(res):
-            # Handles "Label: 0.XXXX" or "Label: 0.XXXX (Details)"
-            return float(res.split(": ")[1].split(" ")[0])
-
-        lr_s = parse_score(lr_res)
-        rnn_s = parse_score(rnn_res)
-        db_s = parse_score(db_res)
-
-        # 4. ENSEMBLE LOGIC (The Screamer & Consensus Rules)
-        weighted_avg = (rnn_s * 0.4) + (lr_s * 0.4) + (db_s * 0.2)
-        highest_score = max(lr_s, rnn_s, db_s)
-
-        # Rule A: The Screamer Rule (One model is certain)
-        if highest_score > 0.90:
-            final_score = max(weighted_avg, highest_score * 0.95)
-
-        # Rule B: The Consensus Rule (Multiple models are suspicious on mid-to-high value)
-        elif amt > 200 and sum(1 for s in [lr_s, rnn_s, db_s] if s > 0.35) >= 2:
-            final_score = max(weighted_avg, 0.51)
-
-        else:
-            final_score = weighted_avg
-
-        # 5. GENERATE UNIFIED REPORT
-        status = "CRITICAL" if final_score > 0.8 else "HIGH" if final_score > 0.5 else "LOW"
-
-        output = f"""TOTAL RISK SCORE: {final_score:.4f}
-RISK STATUS: {status}
-
-DETAILED MODEL BREAKDOWN:
-- Supervised (LR): {lr_s:.4f}
-- Neural (RNN): {rnn_s:.4f}
-- Clustering (DBSCAN): {db_s:.4f}
-
-FINAL_SCORES: LR: {lr_s:.4f}, RNN: {rnn_s:.4f}, DB: {db_s:.4f}, TOTAL: {final_score:.4f}
-"""
-        print(f"✅ UNIFIED INFERENCE COMPLETE: {final_score:.4f}")
-        return output
-
-    except Exception as e:
-        print(f"❌ ENSEMBLE ERROR: {str(e)}")
-        return f"TOTAL RISK SCORE: 0.9999 (INFERENCE_FAILED: {str(e)})"

@@ -1,0 +1,45 @@
+graph TD
+    %% Source Data
+    CSV[("Raw Data:<br/>fraudTrain.csv<br/>fraudTest.csv")]
+
+    %% 1. Ingestion
+    subgraph S1 [Step 1: Ingestion]
+        CSV --> Ingestor["<b>SQL_Ingestor</b>"]
+        Ingestor -- "executes" --> T1("migrate_csv_to_sql_tool")
+        T1 --> DB_Raw[("SQLite: train_transactions")]
+    end
+
+    %% 2. EDA
+    subgraph S2 [Step 2: Analysis]
+        DB_Raw --> EDA["<b>EDAAgent</b>"]
+        EDA -- "executes" --> T2("execute_comprehensive_eda")
+        T2 --> Facade["<b>VisualizerFacade</b>"]
+        Facade --> Plots["correlation_matrix.png<br/>category_fraud_rate.png<br/>amt_hist.png"]
+    end
+
+    %% 3. Preprocessing (The Modular Pipeline)
+    subgraph S3 [Step 3: Transformation]
+        DB_Raw --> Preprocessor["<b>Preprocess_Agent</b>"]
+        Preprocessor -- "executes" --> T3("preprocessing_tool")
+
+        subgraph Pipeline [Modular Functions]
+            F1("drop_irrelevant_features")
+            F2("handle_categorical_encoding")
+            F3("scale_numerical_features")
+        end
+
+        T3 --> F1 --> F2 --> F3
+        F3 --> Scaler["scaler.joblib"]
+        F3 --> DB_Clean[("SQLite: cleaned_scaled_data")]
+    end
+
+    %% 4. Verification
+    subgraph S4 [Step 4: Verification]
+        DB_Clean --> Critic["<b>Quality_Critic</b>"]
+        Plots -.-> Critic
+
+        Critic --> Gate{Audit Result}
+
+        Gate -- "SUCCESS" --> End1([<b>DATA_VERIFIED</b>])
+        Gate -- "FAILED" --> End2([<b>STOP: Error Report</b>])
+    end

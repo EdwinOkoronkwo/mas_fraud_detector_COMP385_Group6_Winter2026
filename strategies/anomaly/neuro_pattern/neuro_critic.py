@@ -1,6 +1,6 @@
 from autogen_agentchat.agents import AssistantAgent
 
-from strategies.anomaly.clustering.critic_agent import verify_anomaly_labels
+from strategies.anomaly.critic_agent import verify_anomaly_labels
 
 
 class NeuroCritic:

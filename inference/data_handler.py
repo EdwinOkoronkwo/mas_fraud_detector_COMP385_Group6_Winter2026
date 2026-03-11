@@ -19,29 +19,72 @@ class DataHandler:
         self.db_path = db_path
 
     def fetch_balanced_samples(self, n_samples: int) -> pd.DataFrame:
-        """Retrieves an equal number of fraud and non-fraud transactions.
-
-        Args:
-            n_samples: The number of transactions to pull for each category
-                       (e.g., if 10, returns 20 total rows).
-
-        Returns:
-            A pandas DataFrame containing transaction features and actual labels.
-        """
+        limit_per_class = n_samples // 2  # Ensures 5 fraud and 5 normal if n=10
         conn = sqlite3.connect(self.db_path)
+
         query = """
-            SELECT * FROM (
-                SELECT CAST(cc_num AS TEXT) as cc_num, amt, zip, lat, long, 
-                       city_pop, unix_time, merch_lat, merch_long, is_fraud as actual_label
-                FROM train_transactions WHERE is_fraud = 1 LIMIT ?
-            )
-            UNION ALL
-            SELECT * FROM (
-                SELECT CAST(cc_num AS TEXT) as cc_num, amt, zip, lat, long, 
-                       city_pop, unix_time, merch_lat, merch_long, is_fraud as actual_label
-                FROM train_transactions WHERE is_fraud = 0 LIMIT ?
-            )
-        """
-        df = pd.read_sql_query(query, conn, params=[n_samples, n_samples])
+                SELECT * \
+                FROM (SELECT CAST(cc_num AS TEXT) as cc_num, \
+                             amt, \
+                             zip, \
+                             lat, \
+                             long, \
+                             city_pop, \
+                             unix_time, \
+                             merch_lat, \
+                             merch_long, \
+                             category, \
+                             gender, \
+                             is_fraud             as actual_label \
+                      FROM test_transactions \
+                      WHERE is_fraud = 1 LIMIT ?)
+                UNION ALL
+                SELECT * \
+                FROM (SELECT CAST(cc_num AS TEXT) as cc_num, \
+                             amt, \
+                             zip, \
+                             lat, \
+                             long, \
+                             city_pop, \
+                             unix_time, \
+                             merch_lat, \
+                             merch_long, \
+                             category, \
+                             gender, \
+                             is_fraud             as actual_label \
+                      FROM test_transactions \
+                      WHERE is_fraud = 0 LIMIT ?)
+                """
+        df = pd.read_sql_query(query, conn, params=[limit_per_class, limit_per_class])
         conn.close()
-        return df
+
+        # Shuffle and reset index so the loop runs 0 to 9 cleanly
+        return df.sample(frac=1).reset_index(drop=True)
+
+    # def fetch_balanced_samples(self, n_samples: int) -> pd.DataFrame:
+    #     """Retrieves an equal number of fraud and non-fraud transactions.
+    #
+    #     Args:
+    #         n_samples: The number of transactions to pull for each category
+    #                    (e.g., if 10, returns 20 total rows).
+    #
+    #     Returns:
+    #         A pandas DataFrame containing transaction features and actual labels.
+    #     """
+    #     conn = sqlite3.connect(self.db_path)
+    #     query = """
+    #         SELECT * FROM (
+    #             SELECT CAST(cc_num AS TEXT) as cc_num, amt, zip, lat, long,
+    #                    city_pop, unix_time, merch_lat, merch_long, is_fraud as actual_label
+    #             FROM train_transactions WHERE is_fraud = 1 LIMIT ?
+    #         )
+    #         UNION ALL
+    #         SELECT * FROM (
+    #             SELECT CAST(cc_num AS TEXT) as cc_num, amt, zip, lat, long,
+    #                    city_pop, unix_time, merch_lat, merch_long, is_fraud as actual_label
+    #             FROM train_transactions WHERE is_fraud = 0 LIMIT ?
+    #         )
+    #     """
+    #     df = pd.read_sql_query(query, conn, params=[n_samples, n_samples])
+    #     conn.close()
+    #     return df

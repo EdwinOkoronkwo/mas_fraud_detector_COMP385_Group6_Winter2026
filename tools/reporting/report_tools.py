@@ -23,40 +23,75 @@ def write_markdown_report(report_content: str, filename: str = "FINAL_FRAUD_STRA
         return f"ERROR: Failed to save report: {str(e)}"
 
 
+
+
+def extract_supervised_metadata(self):
+    """Extracts feature names and model config for the handoff."""
+    # 1. Grab feature names from the data bundle
+    if os.path.exists(self.settings.TEMP_SPLIT_PATH):
+        data = joblib.load(self.settings.TEMP_SPLIT_PATH)
+        # Assuming the bundle is a dict with 'X_train'
+        feature_names = data['X_train'].columns.tolist()
+    else:
+        feature_names = []
+
+    # 2. This will be passed to the 'save_tool'
+    return feature_names
+
+
+def save_inference_metadata(supervised_config: dict, feature_list: list, registry_path: str):
+    """
+    Saves the final champion registry to JSON.
+    """
+    # Defensive extraction to prevent 'KeyError'
+    path = supervised_config.get("path", "models/dynamic_xgb_champion.joblib")
+    m_type = supervised_config.get("type", "xgboost")
+    params = supervised_config.get("params", {})
+
+    registry = {
+        "supervised": {
+            "path": path,
+            "type": m_type,
+            "features": feature_list,
+            "config": {
+                "model_class": "XGBClassifier" if m_type == "xgboost" else "SklearnModel",
+                "params": params
+            }
+        },
+        "weights": {"supervised": 1.0, "neuro": 0.0, "clustering": 0.0},
+        "timestamp": "2026-02-18"
+    }
+
+    os.makedirs(os.path.dirname(registry_path), exist_ok=True)
+    with open(registry_path, 'w') as f:
+        json.dump(registry, f, indent=4)
+    return f"SUCCESS: Registry saved to {registry_path}"
+
+
 import json
 import os
 from datetime import datetime
 
+import joblib
+import os
+from datetime import datetime
+import json
 
-def save_inference_metadata(supervised_path: str, neural_path: str, clustering_path: str) -> str:
-    """
-    Saves the official model selection for the inference pipeline.
 
-    Args:
-        supervised_path (str): Path to the best supervised model.
-        neural_path (str): Path to the best neural pattern model.
-        clustering_path (str): Path to the best clustering model.
-    """
-    # Define registry path relative to the execution root
-    registry_path = "mas_fraud_detector/models/champion_registry.json"
-
-    # Ensure the directory exists
-    os.makedirs(os.path.dirname(registry_path), exist_ok=True)
-
-    metadata = {
-        "champions": {
-            "supervised": supervised_path,
-            "neural": neural_path,
-            "clustering": clustering_path
-        },
-        "scaler_path": "mas_fraud_detector/models/scaler.joblib",
-        "ensemble_weights": {"supervised": 0.4, "neural": 0.4, "clustering": 0.2},
-        "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
-
+def save_hybrid_metadata(supervised_config, neuro_config, clustering_config, feature_list, registry_path):
+    """The 'save_tool' used by the Aggregator to lock in the winners."""
     try:
-        with open(registry_path, "w") as f:
-            json.dump(metadata, f, indent=4)
-        return f"SUCCESS: Registry saved at {registry_path}"
+        registry_data = {
+            "metadata": {"timestamp": "2026-02-21", "status": "Finalized"},
+            "supervised": supervised_config, # Best of XGB or ANN
+            "unsupervised_neuro": neuro_config, # VAE
+            "unsupervised_clustering": clustering_config, # KMeans
+            "features_used": feature_list
+        }
+        os.makedirs(os.path.dirname(registry_path), exist_ok=True)
+        with open(registry_path, 'w') as f:
+            json.dump(registry_data, f, indent=4)
+        return f"SUCCESS: Registry saved to {registry_path}"
     except Exception as e:
-        return f"ERROR SAVING REGISTRY: {str(e)}"
+        return f"REGISTRY_ERROR: {str(e)}"
+

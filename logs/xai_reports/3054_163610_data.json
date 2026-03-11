@@ -1,0 +1,7 @@
+{
+    "supervised": 0.0001,
+    "neural": 0.6789,
+    "clustering": 0.7234,
+    "total": 0.15,
+    "override": "Micro-Transaction Shield"
+}

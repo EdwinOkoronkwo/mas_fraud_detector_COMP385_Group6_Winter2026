@@ -1,0 +1,113 @@
+```markdown
+# **XAI Fraud Risk Report**
+**Transaction ID**: `3528231451607350` | **Amount**: `$320.73`
+**Mode**: **High-Sensitivity (Borderline Pattern Notice)**
+
+---
+## **Verdict**: **APPROVE WITH MONITORING**
+**Confidence**: **38.1%** (Below 50% threshold)
+**Logic Trigger**: **Borderline Disagreement (No Clear Consensus)**
+**Business Context**: **Low-moderate risk**—likely **legitimate but unusual** transaction. Recommend **post-transaction monitoring** for velocity/behavioral shifts.
+
+---
+
+## **1. Score Breakdown (40/40/20 Weighted Ensemble)**
+| Pillar         | Score   | Weight | Contribution |
+|----------------|---------|--------|--------------|
+| Supervised (LR) | 0.1245  | 40%    | **0.0498**   |
+| Neural (RNN)   | 0.4872  | 40%    | **0.1949**   |
+| Clustering (DBSCAN) | 0.3981 | 20%    | **0.0796**   |
+| **TOTAL**      | **0.3812** |        |              |
+
+**Math**:
+`(0.1245 * 0.40) + (0.4872 * 0.40) + (0.3981 * 0.20) = 0.3812`
+
+---
+
+## **2. Override Analysis**
+- **Override**: `None`
+  - **Why?**:
+    - **Low-Value Shield**: Inactive (high-sensitivity mode supersedes auto-approve thresholds).
+    - **High-Confidence Supervised**: Not triggered (LR score = 12.45% < 95%).
+    - **Extreme Anomaly**: Not triggered (Neural/Clustering agreement = 48.7%/39.8% < 90%).
+    - **High-Sensitivity Mode**: *Active* but **not decisive** (no extreme outliers).
+
+---
+
+## **3. Model Conflict Diagnosis**
+### **Key Observations**:
+- **Moderate Disagreement**:
+  - **Supervised (12.45%)**: Slightly unusual but **within known distributions**.
+  - **Neural (48.72%)**: **Mild anomaly** (e.g., unusual time/device but not extreme).
+  - **Clustering (39.81%)**: **Behavioral drift** (e.g., first-time merchant category or geo).
+
+### **Hypotheses**:
+1. **Legitimate but Unusual**:
+   - **New User Behavior**: First purchase in a new category (e.g., travel, electronics).
+   - **Gift/Shared Card**: Transaction by a secondary user (e.g., family member).
+   - **Device Change**: New phone/browser with unrecognized fingerprint.
+
+2. **Low-Confidence Fraud**:
+   - **Probing Attack**: Fraudster testing card validity with a **low-risk transaction** before larger fraud.
+   - **Social Engineering**: Authorized user tricked into a **piggybacking scam** (e.g., "help me buy this").
+
+3. **Model Noise**:
+   - **Temporal Drift**: Neural model flagging **seasonal behavior** (e.g., holiday shopping patterns).
+   - **Feature Collision**: Clustering reacting to **non-fraud outliers** (e.g., VPN use, corporate card).
+
+### **Why Not Block?**
+- **No Synergy**: Neural/Clustering scores are **moderate, not extreme** (both < 50%).
+- **Supervised Anchor**: LR score provides **baseline trust** (not a complete outlier).
+- **Cost-Benefit**: False positives **outweigh risk** for this amount ($320).
+
+---
+
+## **4. Business Impact & Recommendations**
+### **Risk Assessment**:
+| Metric               | Value          |
+|----------------------|----------------|
+| **Fraud Probability** | ~20%           |
+| **False Positive Cost** | High (UX friction, potential churn) |
+| **False Negative Cost** | Moderate ($320 + dispute overhead) |
+
+### **Actions**:
+1. **Approach**:
+   - **APPROVE** the transaction but **flag for monitoring**.
+   - **Post-Transaction Checks**:
+     - Velocity rules (e.g., block if 3 similar transactions in 1 hour).
+     - Device reputation reassessment.
+
+2. **Investigation Triggers**:
+   - If user **repeats this pattern** in next 24h → **escalate to review**.
+   - If **chargeback occurs** → **retrain models** with fraud label.
+
+3. **Proactive Measures**:
+   - **Step-Up Authentication**: For next transaction (e.g., OTP if amount > $500).
+   - **User Notification**: "We noticed unusual activity—was this you?" (reduces dispute risk).
+
+---
+## **5. Visual Summary**
+```
+Supervised: [==       ] 12.4%  (Known but edge-case)
+Neural:     [======    ] 48.7%  (Mild anomaly)
+Clustering: [=====     ] 39.8%  (Behavioral shift)
+Total:      [===       ] 38.1%  → **APPROVE + MONITOR**
+```
+
+---
+## **6. High-Sensitivity Mode Insights**
+- **Calibration Effect**:
+  - Without high-sensitivity mode, this transaction might **auto-approve** (score < 30%).
+  - **Current State**: Flagged for **human-in-the-loop** due to borderline Neural/Clustering scores.
+- **Suggestion**:
+  - For **repeat offenders** (same card with similar patterns), **adjust user-specific thresholds**.
+  - Example: If this card hits `Neural > 0.5` 3x in a week → **temporarily downgrade to "review required"**.
+
+---
+## **7. Customer Experience Consideration**
+- **Friction Justification**:
+  - **No immediate block** preserves UX for likely legitimate users.
+  - **Monitoring** catches **probing fraud** without false positives.
+- **Communication Template**:
+  > *"Your transaction was approved, but we’re monitoring for unusual activity. [Report any unauthorized use here]."*
+```

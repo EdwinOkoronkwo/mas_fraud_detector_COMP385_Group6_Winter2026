@@ -2,7 +2,7 @@ import joblib
 import os
 import json
 from datetime import datetime
-from config.settings import MODELS_DIR
+from config.settings import settings
 
 
 def persist_champion_model(model_name: str, metrics_json: str) -> str:
@@ -15,12 +15,12 @@ def persist_champion_model(model_name: str, metrics_json: str) -> str:
         safe_name = model_name.replace(' ', '_').lower()
 
         meta_filename = f"champion_{safe_name}_{timestamp}_metrics.json"
-        save_path = os.path.join(MODELS_DIR, meta_filename)
+        save_path = os.path.join(settings.MODELS_DIR, meta_filename)
 
         # 2. Write the metrics
         with open(save_path, 'w') as f:
             f.write(metrics_json)
 
-        return f"SUCCESS: Champion ({model_name}) metrics persisted to {MODELS_DIR}"
+        return f"SUCCESS: Champion ({model_name}) metrics persisted to {settings.MODELS_DIR}"
     except Exception as e:
         return f"ERROR during persistence: {str(e)}"

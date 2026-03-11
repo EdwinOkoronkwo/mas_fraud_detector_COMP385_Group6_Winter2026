@@ -1,0 +1,58 @@
+classDiagram
+direction TB
+
+    class Main {
+        +main()
+    }
+
+    %% =====================
+    %% ORCHESTRATION LAYER
+    %% =====================
+    class IPipeline { <<interface>> +run_pipeline() }
+    class FraudPipeline {
+        -IIngestorAgent ingestor
+        -IEDAAgent eda
+        -IPreprocessorAgent preprocessor
+        -IQualityCritic critic
+        +run_pipeline()
+    }
+
+    Main --> IPipeline
+    IPipeline <|.. FraudPipeline
+
+    %% =====================
+    %% INTERFACE LAYER
+    %% =====================
+    class IIngestorAgent { <<interface>> +ingest() }
+    class IEDAAgent { <<interface>> +analyze() }
+    class IPreprocessorAgent { <<interface>> +clean_and_scale() }
+    class IQualityCritic { <<interface>> +verify_dataset() }
+
+    FraudPipeline --> IIngestorAgent
+    FraudPipeline --> IEDAAgent
+    FraudPipeline --> IPreprocessorAgent
+    FraudPipeline --> IQualityCritic
+
+    %% =====================
+    %% AGENT LAYER
+    %% =====================
+    class SQL_Ingestor { +run() }
+    class EDA_Specialist { +run() }
+    class Preprocess_Agent { +run() }
+    class Quality_Critic { +run() }
+
+    IIngestorAgent <|.. SQL_Ingestor
+    IEDAAgent <|.. EDA_Specialist
+    IPreprocessorAgent <|.. Preprocess_Agent
+    IQualityCritic <|.. Quality_Critic
+
+    %% =====================
+    %% TOOLS LAYER (External Functions)
+    %% =====================
+    class IngestTool { +migrate_csv_to_sql_tool() }
+    class EDATool { +generate_eda_plots_tool() }
+    class PreprocessTool { +apply_scaling_and_cleaning_tool() }
+
+    SQL_Ingestor ..> IngestTool : "calls"
+    EDA_Specialist ..> EDATool : "calls"
+    Preprocess_Agent ..> PreprocessTool : "calls"

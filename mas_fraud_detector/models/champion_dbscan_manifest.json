@@ -1,0 +1,40 @@
+{
+    "model_info": {
+        "name": "champion_dbscan",
+        "file": "champion_dbscan.joblib",
+        "type": "sklearn.cluster.DBSCAN"
+    },
+    "inference_params": {
+        "eps": 0.6,
+        "min_samples": 5,
+        "expected_features": [
+            "amt",
+            "zip",
+            "lat",
+            "long",
+            "city_pop",
+            "merch_lat",
+            "merch_long",
+            "category_food_dining",
+            "category_gas_transport",
+            "category_grocery_net",
+            "category_grocery_pos",
+            "category_health_fitness",
+            "category_home",
+            "category_kids_pets",
+            "category_misc_net",
+            "category_misc_pos",
+            "category_personal_care",
+            "category_shopping_net",
+            "category_shopping_pos",
+            "category_travel",
+            "gender_M"
+        ]
+    },
+    "performance_at_train": {
+        "anomaly_count": 2169,
+        "noise_ratio": 0.0167,
+        "total_samples": 129668
+    },
+    "exported_at": "2026-02-16 22:19:25"
+}

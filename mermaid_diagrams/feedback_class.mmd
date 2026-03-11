@@ -1,0 +1,95 @@
+classDiagram
+direction TB
+
+%% Color Definitions
+style StreamlitApp fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+style AnalysisPipeline fill:#fff3e0,stroke:#e65100,stroke-width:2px
+
+style ISecurity fill:#fff3e0,stroke:#e65100
+style ILogger fill:#fff3e0,stroke:#e65100
+style IIngestor fill:#fff3e0,stroke:#e65100
+style ISanitizer fill:#fff3e0,stroke:#e65100
+
+style ITranslateProvider fill:#e8f5e9,stroke:#1b5e20
+style ISentimentProvider fill:#e8f5e9,stroke:#1b5e20
+style IPersistence fill:#e8f5e9,stroke:#1b5e20
+
+%% =====================
+%% ENTRY (USER SPACE)
+%% =====================
+class StreamlitApp {
+    +render_ui()
+}
+
+%% =====================
+%% THE ORCHESTRATOR (YOUR LOGIC)
+%% =====================
+class AnalysisPipeline {
+    -IIngestor ingestor
+    -ISanitizer sanitizer
+    -ISecurity security
+    -ITranslateProvider translator
+    -ISentimentProvider analyzer
+    -IPersistence storage
+    -ILogger logger
+    +run(input_data)
+}
+
+StreamlitApp --> AnalysisPipeline : composes
+
+%% =====================
+%% APP-LEVEL STRATEGIES (YOUR RESPONSIBILITY)
+%% =====================
+
+class ISecurity {
+    <<interface>>
+    +mask_data(text) str
+}
+AnalysisPipeline o-- ISecurity
+ISecurity <|.. SimpleDataProtector : "Handles PII Masking"
+
+class ILogger {
+    <<interface>>
+    +log(action, status)
+}
+AnalysisPipeline o-- ILogger
+ILogger <|.. FileAuditLogger : "Internal Audit Trail"
+
+class IIngestor {
+    <<interface>>
+    +load(data) dict
+}
+AnalysisPipeline o-- IIngestor
+IIngestor <|.. WebIngestor
+
+class ISanitizer {
+    <<interface>>
+    +clean(text) str
+}
+AnalysisPipeline o-- ISanitizer
+ISanitizer <|.. FeedbackSanitizer
+
+%% =====================
+%% CLOUD-LEVEL STRATEGIES (AWS MANAGED)
+%% =====================
+
+class ITranslateProvider {
+    <<interface>>
+    +translate(text) str
+}
+AnalysisPipeline o-- ITranslateProvider
+ITranslateProvider <|.. AWSTranslate : "IAM Protected"
+
+class ISentimentProvider {
+    <<interface>>
+    +get_sentiment(text) dict
+}
+AnalysisPipeline o-- ISentimentProvider
+ISentimentProvider <|.. AWSComprehend : "IAM Protected"
+
+class IPersistence {
+    <<interface>>
+    +persist(final_data)
+}
+AnalysisPipeline o-- IPersistence
+IPersistence <|.. DynamoDBStorage : "Encrypted at Rest (KMS)"
