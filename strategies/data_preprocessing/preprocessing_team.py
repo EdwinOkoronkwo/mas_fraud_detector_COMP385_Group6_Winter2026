@@ -48,7 +48,7 @@ def create_preprocessing_team(sql_ingestor, eda_specialist, feature_engineer, pr
         participants=[
             sql_ingestor.agent,
             eda_specialist.agent,
-            # feature_engineer.agent, # Added to the roster
+            # feature_engineer.agent,
             preprocess_agent.agent,
             critic
         ],

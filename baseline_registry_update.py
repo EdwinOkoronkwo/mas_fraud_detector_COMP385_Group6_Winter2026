@@ -1,99 +1,70 @@
 import joblib
-import json
 import os
 import pandas as pd
-import numpy as np
-from datetime import datetime
 from xgboost import XGBClassifier
 
 # --- CONSTANTS ---
 BASE_PATH = r"C:\CentennialCollege\AI_Capstone_Project\GroupProject\mas_fraud_detector"
-MODEL_FILE = os.path.join(BASE_PATH, "models", "xgb_baseline_24feat.pkl")
-REGISTRY_FILE = os.path.join(BASE_PATH, "reports", "baseline_registry.json")
+MODELS_DIR = os.path.join(BASE_PATH, "models")
 DATA_PATH = os.path.join(BASE_PATH, "data", "temp_split.joblib")
 
-# The 24-feature bridge verified in your logs
+# The specific target for comparison
+BASELINE_OUT = os.path.join(MODELS_DIR, "xgb_baseline_27feat.pkl")
+
+# 🚀 27-Feature Schema
 EXPECTED_FEATURES = [
-    "amt", "zip", "lat", "long", "city_pop", "unix_time", "merch_lat", "merch_long",
-    "amt_to_cat_avg", "high_risk_time",
-    "category_entertainment", "category_food_dining", "category_gas_transport",
-    "category_grocery_net", "category_grocery_pos", "category_health_fitness",
-    "category_home", "category_kids_pets", "category_misc_net", "category_misc_pos",
-    "category_personal_care", "category_shopping_net", "category_shopping_pos",
-    "category_travel"
+    "num__amt", "num__zip", "num__lat", "num__long", "num__city_pop", "num__unix_time", 
+    "num__merch_lat", "num__merch_long", "num__amt_to_cat_avg", "num__high_risk_time", 
+    "num__txn_velocity", "cat__category_entertainment", "cat__category_food_dining", 
+    "cat__category_gas_transport", "cat__category_grocery_net", "cat__category_grocery_pos", 
+    "cat__category_health_fitness", "cat__category_home", "cat__category_kids_pets", 
+    "cat__category_misc_net", "cat__category_misc_pos", "cat__category_personal_care", 
+    "cat__category_shopping_net", "cat__category_shopping_pos", "cat__category_travel", 
+    "cat__gender_F", "cat__gender_M"
 ]
 
+def create_baseline():
+    print(f"📊 Initializing Baseline with 50 trees...")
+    
+    try:
+        # Load data
+        data_path = os.path.join(BASE_PATH, "data", "temp_split.joblib")
+        data = joblib.load(data_path)
+        X_train_raw, y_train = data['train']
 
-def finalize_baseline_model():
-    os.makedirs(os.path.dirname(MODEL_FILE), exist_ok=True)
-    os.makedirs(os.path.dirname(REGISTRY_FILE), exist_ok=True)
-
-    print("🔄 Loading Phase 2 Data for 24-Feature Baseline...")
-    if not os.path.exists(DATA_PATH):
-        print(f"❌ Error: Data not found at {DATA_PATH}")
-        return
-
-    data = joblib.load(DATA_PATH)
-    X_train_raw, y_train = data['train']
-
-    # --- DATA RECONSTRUCTION LOGIC ---
-    if isinstance(X_train_raw, pd.DataFrame):
-        # If it's a DataFrame but missing columns, it will still fail, so we check columns
-        missing = set(EXPECTED_FEATURES) - set(X_train_raw.columns)
-        if not missing:
-            X_train = X_train_raw[EXPECTED_FEATURES]
+        # 🛠️ THE FIX: Handle Sparse Matrices or DataFrames safely
+        if hasattr(X_train_raw, "toarray"):
+            # If it's a sparse matrix (SciPy)
+            X_train_dense = X_train_raw.toarray()
+        elif hasattr(X_train_raw, "values"):
+            # If it's already a DataFrame
+            X_train_dense = X_train_raw.values
         else:
-            print(f"⚠️ DataFrame missing columns: {missing}. Reverting to positional mapping...")
-            X_train = pd.DataFrame(X_train_raw.values[:, :24], columns=EXPECTED_FEATURES)
-    else:
-        # It's likely a NumPy array from the Sampler
-        print(f"💡 Detected {type(X_train_raw)}. Mapping first 24 columns to schema...")
-        # Ensure we have at least 24 columns
-        if X_train_raw.shape[1] < 24:
-            raise ValueError(f"Data error: Expected 24 columns, found {X_train_raw.shape[1]}")
+            # Standard NumPy array
+            X_train_dense = X_train_raw
 
-        # Slice to 24 columns and apply names
-        X_train = pd.DataFrame(X_train_raw[:, :24], columns=EXPECTED_FEATURES)
+        # Now slice exactly 27 features safely
+        X_train_sliced = X_train_dense[:, :27]
+        X_train = pd.DataFrame(X_train_sliced, columns=EXPECTED_FEATURES)
 
-    # --- TRAINING (Using Logged Parameters) ---
-    print(f"🚀 Training Static Baseline (F1 Floor: 0.4878) with shape {X_train.shape}...")
-    model = XGBClassifier(
-        n_estimators=50,
-        max_depth=3,
-        learning_rate=0.1,
-        random_state=42,
-        eval_metric='logloss',
-        tree_method='hist'
-    )
-    model.fit(X_train, y_train)
+        baseline_model = XGBClassifier(
+            n_estimators=50, # 🎯 Strictly 50 trees for baseline
+            max_depth=3,
+            learning_rate=0.05,
+            eval_metric='logloss',
+            random_state=42
+        )
+        
+        print("🌲 Fitting baseline model...")
+        baseline_model.fit(X_train, y_train)
+        
+        # Save ONLY the baseline
+        joblib.dump(baseline_model, BASELINE_OUT)
+        print(f"✅ Baseline Saved: {BASELINE_OUT}")
 
-    # Save Model
-    joblib.dump(model, MODEL_FILE)
-
-    # Save Registry
-    manifest = {
-        "model_info": {
-            "name": "Static_XGB_Baseline",
-            "file": "xgb_baseline_24feat.pkl",
-            "type": "xgboost.XGBClassifier",
-            "tier": "Baseline"
-        },
-        "performance": {
-            "f1_score": 0.4878,
-            "recall": 0.8065,
-            "precision": 0.3497
-        },
-        "metadata": {
-            "finalized_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "feature_count": 24
-        }
-    }
-
-    with open(REGISTRY_FILE, "w") as f:
-        json.dump(manifest, f, indent=4)
-
-    print(f"\n✅ BASELINE GENERATED: {MODEL_FILE}")
+    except Exception as e:
+        print(f"❌ Baseline training failed: {e}")
 
 
 if __name__ == "__main__":
-    finalize_baseline_model()
+    create_baseline()

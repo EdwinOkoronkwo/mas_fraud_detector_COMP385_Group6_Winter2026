@@ -10,6 +10,7 @@ from sqlalchemy import create_engine
 
 from imblearn.over_sampling import SMOTE
 
+from tools.data_prep.feature_eng_tools import FraudToolbox
 from utils.visualizer import VisualizerFacade
 
 import logging
@@ -186,43 +187,50 @@ def preprocessing_tool(db_path: str, target_col: str = 'is_fraud') -> str:
         engine = create_engine(f"sqlite:///{os.path.abspath(db_path)}")
         df = pd.read_sql("SELECT * FROM train_transactions", engine)
 
-        # 1. CLEANING (Pandas) - Keep this for dropping PII/IDs
+        # 1. APPLY YOUR TOOLBOX MANUALLY (The Fix)
+        # First, calculate category means for the Ratio tool
+        cat_means = df.groupby('category')['amt'].mean().to_dict()
+
+        # Call your specific FraudToolbox methods
+        df = FraudToolbox.compute_amt_to_cat_ratio(df, cat_means)
+        df = FraudToolbox.extract_temporal_risk(df)
+        df = FraudToolbox.calculate_velocity(df)
+
+        # 2. CLEANING
         df = drop_irrelevant_features(df)
 
-        # 2. DEFINE GROUPS
+        # 3. DEFINE GROUPS - Whitelist your new Toolbox columns
+        toolbox_cols = ["amt_to_cat_avg", "high_risk_time", "txn_velocity"]
         num_cols = ["amt", "zip", "lat", "long", "city_pop", "unix_time", "merch_lat", "merch_long"]
+        num_cols += toolbox_cols  # Append the new features to be scaled
+
         cat_cols = ["category", "gender"]
 
-        # 3. THE UNIFIED PREPROCESSOR (The Real OHE happens here)
+        # 4. UNIFIED PREPROCESSOR
         preprocessor = ColumnTransformer(
             transformers=[
                 ('num', StandardScaler(), num_cols),
                 ('cat', OneHotEncoder(sparse_output=False, handle_unknown='ignore'), cat_cols)
             ],
-            remainder='drop'  # Ensures we only keep what we defined
+            remainder='drop'
         )
 
-        # 4. FIT & TRANSFORM
+        # 5. FIT & TRANSFORM
         X_raw = df[num_cols + cat_cols]
         y = df[target_col].values
 
-        X_out = preprocessor.fit_transform(X_raw)
+        # NumPy conversion for PyTorch stability
+        X_out = preprocessor.fit_transform(X_raw).astype(np.float32)
 
-        # 5. RECONSTRUCT WITH NAMES
-        # This keeps your 22-24 features properly labeled in SQL
+        # 6. RECONSTRUCT & PERSIST
         feature_names = preprocessor.get_feature_names_out()
         final_df = pd.DataFrame(X_out, columns=feature_names)
         final_df[target_col] = y
 
-        # 6. PERSISTENCE
         final_df.to_sql('cleaned_scaled_data', engine, if_exists='replace', index=False)
+        joblib.dump(preprocessor, "models/preprocessor_base.joblib")
 
-        # SAVE THE ENTIRE BRAIN (OHE + Scaler)
-        model_dir = "models"
-        os.makedirs(model_dir, exist_ok=True)
-        joblib.dump(preprocessor, os.path.join(model_dir, "preprocessor_base.joblib"))
-
-        return f"PREPROCESS_SUCCESS: Unified Sklearn Preprocessor Created. Total Features: {len(feature_names)}."
+        return f"PREPROCESS_SUCCESS: Toolbox Induced {len(toolbox_cols)} features. Total Dim: {len(feature_names)}"
 
     except Exception as e:
         return f"PREPROCESS ERROR: {str(e)}"

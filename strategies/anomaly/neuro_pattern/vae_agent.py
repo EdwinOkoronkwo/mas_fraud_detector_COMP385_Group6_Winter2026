@@ -48,7 +48,7 @@ from torch.utils.data import DataLoader, TensorDataset
 # --- 1. THE STABLE VAE ARCHITECTURE ---
 
 class VAE(nn.Module):
-    def __init__(self, input_dim=24, latent_dim=8):
+    def __init__(self, input_dim, latent_dim=8): # Removed hardcoded 24
         super(VAE, self).__init__()
 
         # 🚀 WIDER & DEEPER ENCODER
@@ -141,7 +141,7 @@ def train_vae_sim(data_path: str = "data/temp_split.joblib", latent_dim: int = 8
                 data = batch[0]
                 optimizer.zero_grad()
                 recon, mu, logvar = model(data)
-                loss = vae_loss_function(recon, data, mu, logvar)
+                loss = vae_loss_function(recon, data, mu, logvar, beta=0.1)
 
                 if torch.isnan(loss): continue
                 loss.backward()
