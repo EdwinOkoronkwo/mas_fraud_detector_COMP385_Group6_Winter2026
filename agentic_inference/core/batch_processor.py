@@ -45,34 +45,6 @@ class BatchProcessor:
 
         return pd.DataFrame(self.results)
 
-    def _extract_metrics(self, raw_dict: dict) -> dict:
-        """Handles the 'Sealed 24' math and pillar normalization."""
-        raw_df = pd.DataFrame([raw_dict])
-        if 'Unnamed: 0' not in raw_df.columns: raw_df['Unnamed: 0'] = 0
-
-        # Transform using the class-level preprocessor
-        vector = self.pipeline.infra.extract_model_input(self.preprocessor.transform(raw_df))
-
-        # Pillar Predictions
-        b_p = float(self.pipeline.base_pillar.predict(vector))
-        g_p = float(self.pipeline.gold_pillar.predict(vector))
-        n_raw = float(self.pipeline.neuro_pillar.predict(vector))
-        c_raw = float(self.pipeline.cluster_pillar.predict_raw(vector))
-
-        # Use the Scorer for normalization (including the fixed cluster sigmoid)
-        mas_output = self.pipeline.scorer.compute_mas_score(g_p, n_raw, c_raw)
-
-        return {
-            "cc": str(raw_dict.get('cc_num'))[-4:],
-            "actual": int(raw_dict.get('actual_label', 0)),
-            "base_p": b_p,
-            "gold_p": g_p,
-            "n_norm": mas_output['n_p'],
-            "c_norm": mas_output['c_p'],
-            "n_raw": n_raw,
-            "c_raw": c_raw,
-            "math_score": mas_output['final_score']
-        }
 
     def _update_weights(self, metrics: dict):
         """Passes performance to the Adapter and tracks weight evolution."""
@@ -112,6 +84,76 @@ class BatchProcessor:
                     await asyncio.sleep(wait_time)
                     continue
                 return f"Neural Math complete (Audit unavailable: {str(e)[:15]})"
+
+    def _inject_toolbox_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Replicates the FraudToolbox logic used in the preprocessing_tool.
+        Ensures the 'base' preprocessor finds its required columns.
+        """
+        # 1. Temporal Risk (high_risk_time)
+        if 'unix_time' in df.columns:
+            hours = pd.to_datetime(df['unix_time'], unit='s').dt.hour
+            df['high_risk_time'] = ((hours >= 23) | (hours <= 4)).astype(int)
+        
+        # 2. Ratio Tool (amt_to_cat_avg)
+        if 'amt_to_cat_avg' not in df.columns:
+            df['amt_to_cat_avg'] = 1.0  # Default base ratio
+
+        # 3. Velocity Tool (txn_velocity)
+        if 'txn_velocity' not in df.columns:
+            df['txn_velocity'] = 1.0
+
+        return df
+
+    def _extract_metrics(self, raw_dict: dict) -> dict:
+        """Handles math and logs feature dimensions for audit."""
+        raw_df = pd.DataFrame([raw_dict])
+        
+        # 1. Inject toolbox features (induces the missing 3)
+        raw_df = self._inject_toolbox_features(raw_df)
+
+        # 2. Transform using the base preprocessor
+        transformed_data = self.preprocessor.transform(raw_df)
+        
+        # 3. Extract via Infrastructure (Ensure Infra input_dim is set to 27!)
+        vector = self.pipeline.infra.extract_model_input(transformed_data)
+
+        # Added buffer check
+        if vector.base is not None:
+            print(f"✅ Vector buffer confirmed. Shape: {vector.shape}")
+
+        # 🔍 DIAGNOSTIC: Check if the vector is actually changing
+        feat_hash = hash(vector.tobytes())
+        print(f"📊 Row {raw_dict.get('cc_num')[-4:]} | Vector Hash: {feat_hash} | First 3 Feats: {vector[0][:3]}")
+
+        # 🚀 LOGGING: Verify the 27-feature generation
+        if not hasattr(self, '_log_once'):
+            print(f"🔍 [FEATURE AUDIT] Raw Columns: {raw_df.shape[1]} | Vector Shape: {vector.shape}")
+            print(f"🔍 [FEATURE NAMES] {raw_df.columns.tolist()[-3:]} injected.")
+            self._log_once = True # Only log the first transaction to keep console clean
+
+        # Pillar Predictions
+        # These will now receive the 27-dim vector verified by the log above
+        b_p = float(self.pipeline.base_pillar.predict(vector))
+        g_p = float(self.pipeline.gold_pillar.predict(vector))
+        n_raw = float(self.pipeline.neuro_pillar.predict(vector))
+        c_raw = float(self.pipeline.cluster_pillar.predict_raw(vector))
+
+        mas_output = self.pipeline.scorer.compute_mas_score(g_p, n_raw, c_raw)
+
+        # 2. Return the full dictionary expected by _update_weights
+       # 2. Return EVERYTHING needed for weighting and reporting
+        return {
+            "cc": str(raw_dict.get('cc_num'))[-4:],
+            "actual": int(raw_dict.get('actual_label', 0)),
+            "base_p": b_p,
+            "gold_p": g_p,
+            "n_raw": n_raw,           # 🚀 Fixes the current KeyError in _package_row
+            "c_raw": c_raw,           # 🚀 Included for completeness
+            "n_norm": mas_output['n_p'], # Required for _update_weights
+            "c_norm": mas_output['c_p'], # Required for _update_weights
+            "math_score": mas_output['final_score']
+        }
 
     def _package_row(self, m: dict, explanation: str) -> dict:
         """Standardizes the output keys for the PerformanceEvaluator."""

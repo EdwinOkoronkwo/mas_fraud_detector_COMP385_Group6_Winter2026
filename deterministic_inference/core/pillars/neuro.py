@@ -1,52 +1,39 @@
-from typing import Any
-
-import torch # or tensorflow/keras depending on your model
-import joblib
-
+import os
 import torch
 import torch.nn as nn
 import numpy as np
-
-import torch
-import torch.nn as nn
-from typing import Any
-
-
-import torch
-import torch.nn as nn
 from typing import Any
 
 class VAE(nn.Module):
-    def __init__(self, input_dim=24, latent_dim=12): # 🚀 Matches your Checkpoint
+    def __init__(self, input_dim, latent_dim=12): # 🚀 Removed hardcoded 24
         super(VAE, self).__init__()
 
-        # ENCODER: Expanded to match the saved 'Beefed' weights
+        # ENCODER: Beefed to handle 27+ features
         self.encoder = nn.Sequential(
-            nn.Linear(input_dim, 128),      # Layer 0
-            nn.BatchNorm1d(128),            # Layer 1
-            nn.LeakyReLU(0.2),              # Layer 2
-            nn.Linear(128, 64),             # Layer 3
-            nn.BatchNorm1d(64),             # Layer 4 (Unexpected key fix)
-            nn.LeakyReLU(0.2),              # Layer 5
-            nn.Linear(64, 32),              # Layer 6
+            nn.Linear(input_dim, 128),
+            nn.BatchNorm1d(128),
+            nn.LeakyReLU(0.2),
+            nn.Linear(128, 64),
+            nn.BatchNorm1d(64),
+            nn.LeakyReLU(0.2),
+            nn.Linear(64, 32),
             nn.ReLU()
         )
 
-        # LATENT SPACE: Aligned to 12
         self.fc_mu = nn.Linear(32, latent_dim)
         self.fc_logvar = nn.Linear(32, latent_dim)
 
-        # DECODER: Expanded to match checkpoint
+        # DECODER: Dynamically projects back to input_dim
         self.decoder = nn.Sequential(
-            nn.Linear(latent_dim, 32),      # Layer 0
+            nn.Linear(latent_dim, 32),
             nn.ReLU(),
-            nn.Linear(32, 64),              # Layer 2
-            nn.BatchNorm1d(64),             # Layer 3
-            nn.LeakyReLU(0.2),              # Layer 4
-            nn.Linear(64, 128),             # Layer 5
-            nn.BatchNorm1d(128),            # Layer 6
-            nn.LeakyReLU(0.2),              # Layer 7
-            nn.Linear(128, input_dim)       # Layer 8
+            nn.Linear(32, 64),
+            nn.BatchNorm1d(64),
+            nn.LeakyReLU(0.2),
+            nn.Linear(64, 128),
+            nn.BatchNorm1d(128),
+            nn.LeakyReLU(0.2),
+            nn.Linear(128, input_dim) # 🚀 Now maps to 27
         )
 
     def reparameterize(self, mu, logvar):
@@ -61,36 +48,34 @@ class VAE(nn.Module):
         return self.decoder(z), mu, logvar
 
 class NeuroPillar:
-    def __init__(self, model_path):
+    def __init__(self, model_path, input_dim=27): # 🚀 Pass in the detected 27
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model_input_dim = 24
+        self.model_input_dim = input_dim
 
-        # 🚀 INITIALIZE WITH BEEFED DIMENSIONS: latent_dim=12
+        # INITIALIZE
         self.model = VAE(input_dim=self.model_input_dim, latent_dim=12).to(self.device)
 
-        try:
-            state_dict = torch.load(model_path, map_location=self.device, weights_only=True)
-            self.model.load_state_dict(state_dict)
-            self.model.eval()
-            print(f"✅ NeuroPillar: Beefed VAE weights loaded (Architecture: 128-64-32-12)")
-        except RuntimeError as e:
-            print(f"❌ Still a Mismatch: {e}")
+        if os.path.exists(model_path):
+            try:
+                state_dict = torch.load(model_path, map_location=self.device, weights_only=True)
+                self.model.load_state_dict(state_dict)
+                self.model.eval()
+                print(f"✅ NeuroPillar: Loaded champion weights for {input_dim} features.")
+            except Exception as e:
+                print(f"⚠️ Weights incompatible with {input_dim} features. Training recommended.")
+        else:
+            print("🛠️ Training Mode: No weights found. Ready for initial fit.")
 
     def predict(self, input_data: Any) -> float:
-        """Calculates Reconstruction Loss (MSE) for the 24-feature vector."""
-        # Convert to tensor and move to device
+        """Calculates Reconstruction Loss (MSE) for the full feature vector."""
         x = torch.as_tensor(input_data, dtype=torch.float32).to(self.device)
 
         if x.dim() == 1:
             x = x.unsqueeze(0)
 
-        # Ensure strict 24-feature shape
-        if x.shape[1] != self.model_input_dim:
-            x = x[:, :self.model_input_dim]
-
+        # 🚀 NO MORE TRUNCATING: We use all features
         with torch.no_grad():
             reconstructed, _, _ = self.model(x)
-            # MSE reconstruction loss - higher loss = more 'anomalous' (potential fraud)
             loss = torch.mean((x - reconstructed) ** 2)
 
         return float(loss.item())

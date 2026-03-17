@@ -1,17 +1,16 @@
 {
     "model_info": {
         "name": "Static_XGB_Baseline",
-        "file": "xgb_baseline_24feat.pkl",
-        "type": "xgboost.XGBClassifier",
+        "file": "xgb_baseline_27feat.pkl",
         "tier": "Baseline"
     },
-    "performance": {
-        "f1_score": 0.4878,
-        "recall": 0.8065,
-        "precision": 0.3497
+    "performance_at_creation": {
+        "f1_score": 0.5155,
+        "recall": 0.871,
+        "precision": 0.3661
     },
     "metadata": {
-        "finalized_at": "2026-03-11 12:07:14",
-        "feature_count": 24
+        "finalized_at": "2026-03-11 15:45:58",
+        "feature_count": 27
     }
 }

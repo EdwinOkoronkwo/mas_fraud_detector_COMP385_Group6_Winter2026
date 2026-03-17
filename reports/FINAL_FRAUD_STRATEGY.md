@@ -3,30 +3,27 @@
 ## MODEL COMPARISON
 | Model Type       | Key Metric               | Value  | Notes                                      |
 |------------------|--------------------------|--------|--------------------------------------------|
-| Supervised (XGB) | Recall                   | 0.76   | Balanced but misses edge cases.           |
-| Neuro (VAE)      | True Positives (TP)      | 166    | Detects anomalies missed by supervised.   |
-| Clustering       | Silhouette Score         | 0.2121 | Broad anomaly detection (1297 outliers). |
+| Supervised (XGB) | Recall                   | 0.76   | Balanced but missed ~24% of fraud cases   |
+| Neuro (VAE)      | True Positives (Anomaly) | 166    | Captured high-risk cases missed by XGB    |
+| Clustering       | Silhouette Score         | 0.2121 | Broad anomaly detection (1297 flagged)    |
 
 ## CHAMPION SELECTION
 **Primary:** `champion_vae.pth` (Neuro)
-- **Rationale:** The VAE's 166 TP at 97% precision addresses the critical gap in supervised recall, aligning with the goal of minimizing false negatives in fraud.
+- **Rationale:** The VAE's 166 true positives at 97% precision address the XGB's recall gap, making it ideal for high-stakes fraud detection where false negatives are costly.
 
 **Secondary:** `champion_xgb_dynamic.pkl` (Supervised)
-- **Role:** Validates high-confidence predictions and reduces VAE's false positives.
+- **Rationale:** Used for explainability and baseline validation. Recall of 0.76 ensures broad coverage.
 
-## FEATURES USED (24)
-- **Numerical:** `amt`, `zip`, `lat`, `long`, `city_pop`, `unix_time`, `merch_lat`, `merch_long`
-- **Categorical:** Transaction categories (e.g., `category_entertainment`), `gender_F`, `gender_M`
+## FEATURES USED (27)
+- **Numerical:** `amt`, `zip`, `lat`, `long`, `city_pop`, `unix_time`, `merch_lat`, `merch_long`, `amt_to_cat_avg`, `high_risk_time`, `txn_velocity`
+- **Categorical:** One-hot encoded transaction categories (`entertainment`, `food_dining`, etc.) and `gender`.
 
 ## DEPLOYMENT ARCHITECTURE
-1. **VAE Layer:** Flags potential fraud for review.
-2. **XGB Layer:** Cross-checks VAE outputs to filter noise.
-3. **Clustering:** Monitors macro-trends (non-real-time).
+1. **Real-Time Pipeline:** VAE flags anomalies → XGB validates high-probability cases.
+2. **Fallback:** K-Means clusters for macro-level monitoring.
 
 ## RISK MITIGATION
-- **False Positives:** XGB's precision (F1=0.73) filters VAE's outliers.
-- **False Negatives:** VAE's 166 TP compensates for XGB's recall gap.
+- **VAE Threshold Tuning:** Adjust `threshold_p` to balance precision/recall.
+- **Feature Refresh:** Quarterly review of `amt_to_cat_avg` and `txn_velocity`.
 
-## NEXT STEPS
-- A/B test VAE+XGB ensemble vs. XGB alone.
-- Monitor clustering drift weekly.
+---

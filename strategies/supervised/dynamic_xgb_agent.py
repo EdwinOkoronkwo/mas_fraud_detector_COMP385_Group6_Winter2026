@@ -99,21 +99,23 @@ class DynamicXGBAgent:
                     You are a Senior ML Engineer. Current ANN Champion is at F1=0.63. 
                     XGBoost MUST beat this to be certified as GOLD.
 
+                    CRITICAL PARAMETER: 'n_estimators'
+                    - Overfitting Detected: Previous 400+ estimators were too high.
+                    - NEW RANGE: 100-200. This should stabilize the F1-score.
+
                     CRITICAL PARAMETER: 'scale_pos_weight'
-                    - Your previous attempts at scale=100+ resulted in 90%+ Recall but failed 
-                      on Precision (F1 crashed).
-                    - NEW RANGE: Try values between 10.0 and 50.0. 
-                    - Logic: Since we evaluate at a 0.3 threshold, a lower scale (e.g., 15-30) 
-                      usually yields the highest F1 by protecting Precision.
+                    - TARGET: 10.0 to 25.0. 
+                    - Logic: High scale (100+) is for 'Recall-only' tasks. For F1 (Gold), 
+                      we need Precision. Since the dataset imbalance is roughly 1:100, 
+                      a scale of 15-20 usually provides the best trade-off.
 
                     HYPERPARAMETER GUIDANCE:
-                    - 'max_depth': 4-7. 
-                    - 'n_estimators': 400-800.
-                    - 'learning_rate': 0.01-0.05.
+                    - 'max_depth': 3-5 (Shallow trees prevent overfitting).
+                    - 'learning_rate': 0.05-0.1 (Faster convergence with fewer trees).
 
                     STRATEGY:
-                    1. Attempt 1 (The Balanced Guard): (scale=20, n=500, d=4, lr=0.05).
-                    2. Attempt 2 (The Interaction Search): (scale=35, n=600, d=6, lr=0.02).
-                    3. Attempt 3: Pivot based on which attempt got closer to F1=0.77.
+                    1. Attempt 1 (Conservative): (scale=15, n=120, d=3, lr=0.1).
+                    2. Attempt 2 (Balanced): (scale=22, n=150, d=4, lr=0.08).
+                    3. Attempt 3: Fine-tune around the 150-estimator mark to hit F1 > 0.70.
                     """
         )
