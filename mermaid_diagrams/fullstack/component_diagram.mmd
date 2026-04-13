@@ -1,0 +1,28 @@
+graph TB
+    subgraph UI_Layer [User Interface]
+        UI[Streamlit View Engine]
+    end
+
+    subgraph Logic_Layer [Service Layer]
+        CTRL[Inference Controller]
+        ENG[MAS Pipeline Engine]
+    end
+
+    subgraph Agent_Layer [Agent Factory]
+        SUP[Supervised Agents]
+        ANOM[Anomaly Agents]
+        RAG[RAG Researcher]
+    end
+
+    subgraph Data_Layer [Persistence]
+        SQL[(Transaction SQL)]
+        VEC[(Policy Vector DB)]
+    end
+
+    UI <--> CTRL
+    CTRL <--> ENG
+    CTRL <--> SQL
+    ENG --> SUP
+    ENG --> ANOM
+    ENG --> RAG
+    RAG <--> VEC

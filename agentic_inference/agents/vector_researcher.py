@@ -5,32 +5,37 @@ class VectorResearcher:
     def __init__(self, model_client, vector_service):
         self.vector_service = vector_service
 
-        # 1. Define the function
-        # Add **kwargs here as a safety net for LangChain's 'config' injection
+        # Define the tool with built-in redundancy
         async def query_policy_guidelines(query: str) -> str:
-            """Searches bank policy. Recovers section headers if a specific match is missing."""
-            retriever = vector_service.get_retriever(search_kwargs={"k": 2})
-            docs = await retriever.ainvoke(query)
-            if not docs:
-                return "NO POLICY DATA FOUND."
+            """
+            Searches bank policy v2026.1.
+            If specific query fails, it pulls general fraud threshold guidelines.
+            """
+            try:
+                retriever = self.vector_service.get_retriever(search_kwargs={"k": 2})
+                docs = await retriever.ainvoke(query)
 
-            header = "BANKING OPERATIONAL POLICY (v2026.1)\n"
-            return f"{header}\n" + "\n\n".join([d.page_content for d in docs])
+                # Fallback Logic: If specific search (e.g., "Neuro MSE 0.05") fails
+                if not docs or len(docs) == 0:
+                    fallback = "Standard Anomaly Thresholds and Category Risk Rules"
+                    docs = await retriever.ainvoke(fallback)
 
+                if not docs:
+                    return "ERROR: Policy database unreachable or empty."
+
+                header = "--- BANKING OPERATIONAL POLICY (v2026.1) ---\n"
+                return header + "\n\n".join([d.page_content for d in docs])
+
+            except Exception as e:
+                return f"TECHNICAL ERROR DURING POLICY RETRIEVAL: {str(e)}"
+
+        # Now attach the tool to the agent
         self.agent = AssistantAgent(
             name="Vector_Researcher",
             model_client=model_client,
             tools=[query_policy_guidelines],
-            system_message="""[ROLE: COMPLIANCE EXPLAINER]
-            You receive a Math Risk Score and transaction details. 
-            Your job is to provide a human-readable explanation using corporate policy context.
-
-            INSTRUCTIONS:
-            1. If Neuro MSE is LOW (< 0.10): Explain that the behavior is mathematically normal and consistent with historical patterns.
-            2. If Neuro MSE is HIGH (> 0.30): Explain that the transaction shows high-entropy anomalies matching fraud signatures.
-            3. Use the POLICY_CONTEXT to mention specific rules (e.g., Merchant Category or Geographic limits).
-            4. If SQL data is missing, rely on the MATH_CONTEXT provided in the prompt to explain the result.
-
-            DO NOT return SQL error messages. Return a 1-2 sentence professional audit summary.
-            """
+            system_message="""[ROLE: COMPLIANCE ANALYST]
+            1. Search the policy for rules matching the MSE score or Merchant Category.
+            2. Extract the specific Rule ID and required compliance action.
+            3. If the tool returns general guidelines, apply the 'Standard Threshold' rule."""
         )

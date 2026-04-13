@@ -1,0 +1,18 @@
+graph TD
+    %% Level 1: The High-Level Policy
+    VP[VisionPipeline] --> IDI[interface: IDataIngestor]
+    VP --> IDP[interface: IDataPreprocessor]
+
+    %% Level 2: The Orchestrator Implementation
+    IDP --> DP[concrete: DataPreprocessor]
+
+    %% Level 3: The Specialized Service Interfaces
+    DP --> IDS[interface: IDataSplitter]
+    DP --> IFS[interface: IDataFormatStrategy]
+    DP --> IDT[interface: IDataTransformer]
+
+    %% Level 4: The Concrete Workers
+    IDS --> VDS[concrete: VisionDataSplitter]
+    IFS --> TFR[concrete: TFRecordStrategy]
+    IFS --> STF[concrete: StandardTFDataStrategy]
+    IDT --> VIT[concrete: ViTTransformer]

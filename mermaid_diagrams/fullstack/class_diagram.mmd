@@ -1,0 +1,110 @@
+classDiagram
+direction TB
+
+%% =====================
+%% 1. UI LAYER (The Peak)
+%% =====================
+class Main {
+    +apply_custom_style()
+    +main()
+}
+
+class Streamlit_Views {
+    <<Namespace>>
+    +BatchView
+    +SimulatorView
+    +CustomerView
+}
+
+Main --> Streamlit_Views
+
+%% =====================
+%% 2. CONTROLLER LAYER (The Bridge)
+%% =====================
+class InferenceController {
+    +pipeline: FraudPipeline
+    +run_single_inference() : InferenceResult
+    +run_ui_batch() : List~InferenceResult~
+}
+
+Streamlit_Views --> InferenceController
+
+%% =====================
+%% 3. ORCHESTRATION LAYER (The Engine)
+%% =====================
+class IPipeline { <<interface>> +run() }
+class FraudPipeline {
+    +planner: Planner
+    +critic: Critic
+    +run(Transaction) : InferenceResult
+}
+
+InferenceController --> IPipeline
+IPipeline <|.. FraudPipeline
+
+%% =====================
+%% 4. SPECIALIZED TEAMS (The Workforce)
+%% =====================
+subgraph Data_Preparation
+    class IDataAgent { <<interface>> }
+    class SQL_Ingestor_Agent
+    class EDA_Agent
+    class Cleaner_Agent
+end
+
+subgraph Agent_Hierarchies
+    class Planner { +delegate_tasks() }
+    class Critic { +evaluate() }
+    class ISupervisedAgent { <<interface>> }
+    class IAnomalyAgent { <<interface>> }
+end
+
+FraudPipeline --> IDataAgent
+FraudPipeline --> Planner
+FraudPipeline --> Critic
+
+IDataAgent <|.. SQL_Ingestor_Agent
+IDataAgent <|.. EDA_Agent
+IDataAgent <|.. Cleaner_Agent
+
+Planner --> ISupervisedAgent
+Planner --> IAnomalyAgent
+
+%% =====================
+%% 5. STRATEGY LAYER (The Specialists)
+%% =====================
+ISupervisedAgent <|.. XGB_Agent
+ISupervisedAgent <|.. RF_Agent
+IAnomalyAgent <|-- IClustering
+IAnomalyAgent <|-- INeuroPattern
+
+%% =====================
+%% 6. DOMAIN MODELS (The Foundation)
+%% =====================
+class Customer {
+    +cc_num: str
+    +home_lat: float
+    +home_long: float
+    +avg_txn_amt: float
+}
+
+class Transaction {
+    +amt: float
+    +category: str
+    +merch_lat: float
+    +merch_long: float
+    +behavioral_context: dict
+}
+
+class InferenceResult {
+    +mas_score: float
+    +verdict: str
+    +explanation: str
+    +model_breakdown: dict
+}
+
+%% Relationships to Data Objects
+CustomerView ..> Customer : "Creates"
+InferenceController ..> Customer : "Queries"
+InferenceController ..> Transaction : "Enriches"
+FraudPipeline ..> InferenceResult : "Returns"

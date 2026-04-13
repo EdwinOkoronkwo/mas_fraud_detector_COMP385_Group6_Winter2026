@@ -1,0 +1,16 @@
+[theme]
+# Deep Ocean Background
+backgroundColor = "#0f172a"
+# Lighter Slate for Sidebar/Cards
+secondaryBackgroundColor = "#1e293b"
+# Off-white for readability
+textColor = "#f8fafc"
+# 💖 The Magenta Accent (Buttons, Sliders, Links)
+primaryColor = "#d946ef"
+# Font matching Material Design
+font = "sans serif"
+
+[server]
+headless = true
+enableCORS = false
+enableXsrfProtection = false

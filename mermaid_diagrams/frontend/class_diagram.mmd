@@ -1,0 +1,42 @@
+classDiagram
+    class Main {
+        +apply_custom_style()
+        +main()
+    }
+
+    class BatchView {
+        +controller: InferenceController
+        +render(ui_params: dict)
+    }
+
+    class SimulatorView {
+        +controller: InferenceController
+        +render(ui_params: dict)
+        -_build_tx_dict()
+        -_display_results()
+    }
+
+    class CustomerView {
+        +render()
+        -_create_customer()
+        -_render_directory()
+    }
+
+    class InferenceController {
+        +pipeline: InferencePipeline
+        +run_single_inference(tx_data, params)
+        +run_ui_batch(n_samples, params)
+    }
+
+    class MetricsComponent {
+        <<static>>
+        +render_performance_comparison(df, threshold)
+        +render_trust_weights(weights)
+    }
+
+    Main --> BatchView
+    Main --> SimulatorView
+    Main --> CustomerView
+    BatchView ..> MetricsComponent
+    BatchView --> InferenceController
+    SimulatorView --> InferenceController

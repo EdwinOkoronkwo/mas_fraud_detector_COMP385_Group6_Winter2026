@@ -16,41 +16,49 @@ import torch
 import torch.nn as nn
 from typing import Any
 
+
 class VAE(nn.Module):
-    def __init__(self, input_dim=24, latent_dim=12): # 🚀 Matches your Checkpoint
+    """
+    Updated Beefed VAE Architecture.
+    Matches confirmed dimensions: 24 Input Features -> 12 Latent Dimensions.
+    """
+
+    def __init__(self, input_dim=24, latent_dim=12):
         super(VAE, self).__init__()
 
-        # ENCODER: Expanded to match the saved 'Beefed' weights
+        # Encoder: 24 -> 128 -> 64 -> 32
         self.encoder = nn.Sequential(
-            nn.Linear(input_dim, 128),      # Layer 0
-            nn.BatchNorm1d(128),            # Layer 1
-            nn.LeakyReLU(0.2),              # Layer 2
-            nn.Linear(128, 64),             # Layer 3
-            nn.BatchNorm1d(64),             # Layer 4 (Unexpected key fix)
-            nn.LeakyReLU(0.2),              # Layer 5
-            nn.Linear(64, 32),              # Layer 6
+            nn.Linear(input_dim, 128),
+            nn.BatchNorm1d(128),
+            nn.LeakyReLU(0.2),
+            nn.Linear(128, 64),
+            nn.BatchNorm1d(64),
+            nn.LeakyReLU(0.2),
+            nn.Linear(64, 32),
             nn.ReLU()
         )
 
-        # LATENT SPACE: Aligned to 12
+        # Latent space: 32 -> 12 (mu and logvar)
         self.fc_mu = nn.Linear(32, latent_dim)
         self.fc_logvar = nn.Linear(32, latent_dim)
 
-        # DECODER: Expanded to match checkpoint
+        # Decoder: 12 -> 32 -> 64 -> 128 -> 24
         self.decoder = nn.Sequential(
-            nn.Linear(latent_dim, 32),      # Layer 0
+            nn.Linear(latent_dim, 32),
             nn.ReLU(),
-            nn.Linear(32, 64),              # Layer 2
-            nn.BatchNorm1d(64),             # Layer 3
-            nn.LeakyReLU(0.2),              # Layer 4
-            nn.Linear(64, 128),             # Layer 5
-            nn.BatchNorm1d(128),            # Layer 6
-            nn.LeakyReLU(0.2),              # Layer 7
-            nn.Linear(128, input_dim)       # Layer 8
+            nn.Linear(32, 64),
+            nn.BatchNorm1d(64),
+            nn.LeakyReLU(0.2),
+            # Index 5: 64 -> 128
+            nn.Linear(64, 128),
+            nn.BatchNorm1d(128),
+            nn.LeakyReLU(0.2),
+            # Index 8: 128 -> 24 (Matches Output Features)
+            nn.Linear(128, input_dim)
         )
 
     def reparameterize(self, mu, logvar):
-        std = torch.exp(0.5 * torch.clamp(logvar, -10, 10))
+        std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
         return mu + eps * std
 

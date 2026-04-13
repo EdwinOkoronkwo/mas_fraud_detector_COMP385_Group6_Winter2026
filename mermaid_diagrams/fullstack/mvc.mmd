@@ -1,0 +1,55 @@
+graph TD
+    subgraph "VIEW LAYER (Streamlit)"
+        V1[BatchView]
+        V2[SimulatorView]
+        V3[CustomerView]
+    end
+
+    subgraph "CONTROLLER LAYER"
+        C[InferenceController]
+    end
+
+    subgraph "MODEL LAYER (The Core Engine)"
+        P[InferencePipeline]
+        AF[AgentFactory]
+
+        subgraph "Agent Hierarchies"
+            S_Team[ISupervisedAgent Team]
+            A_Team[IAnomalyAgent Team]
+            R_Team[RagAuditTeam]
+        end
+    end
+
+    subgraph "DATA OBJECTS (Schemas)"
+        M1[Customer Profile]
+        M2[Transaction Row]
+        M3[Inference_Result]
+    end
+
+    subgraph "DATA LAYER (Persistence)"
+        DB_SQL[(SQLite: DB)]
+        DB_VEC[(Vector DB)]
+    end
+
+    %% --- FLOW ---
+    V3 -- "Creates" --> M1
+    M1 -- "Saved to" --> DB_SQL
+
+    V1 & V2 -- "Inputs" --> C
+    C -.->|Lookup| DB_SQL
+    DB_SQL -.->|Returns| M1
+
+    C -- "Enriches" --> M2
+    M2 -- "Processed by" --> P
+
+    P --> AF
+    AF --> S_Team & A_Team & R_Team
+
+    %% Internal Logic
+    S_Team & A_Team -- "Scores" --> M3
+    R_Team -- "Narrative" --> M3
+    R_Team -.->|Policy| DB_VEC
+
+    M3 -- "Finalized" --> P
+    P -- "Returns" --> C
+    C -- "Displays" --> V1 & V2

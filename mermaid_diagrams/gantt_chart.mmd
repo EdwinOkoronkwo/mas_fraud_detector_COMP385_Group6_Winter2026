@@ -1,0 +1,48 @@
+%%{init: { "gantt": { "barHeight": 30, "barGap": 12, "useWidth": 1200, "todayMarker": false } }}%%
+gantt
+    title COMP 385: Multi-Agent Fraud Detection Schedule
+    dateFormat  YYYY-MM-DD
+    axisFormat  %b %d
+    tickInterval 1w
+
+    section EDA & Planning
+    Project Planning            :a1, 2026-01-12, 14d
+
+    section Data & Ethics
+    Dataset Selection           :a2, 2026-01-19, 7d
+
+    section Proposal (10%)
+    Proposal Submission         :crit, milestone, m1, 2026-02-01, 0d
+
+    section Algo Selection
+    Model Benchmarking          :a3, 2026-01-26, 7d
+
+    section Agent Design
+    Agent Logic Design          :a4, 2026-01-26, 7d
+
+    section Preprocessing
+    AI Iteration #1             :a5, 2026-02-02, 14d
+
+    section Model Build
+    AI Iteration #1             :a6, 2026-02-16, 12d
+    Progress Report #1 (15%)    :crit, milestone, m2, 2026-02-22, 0d
+
+    section Iteration #2
+    AI Iteration #2             :a7, 2026-03-02, 14d
+
+    section Orchestration
+    AI Iteration #2             :a8, 2026-03-09, 12d
+    Progress Report #2 (15%)    :crit, milestone, m3, 2026-03-20, 0d
+
+    section UI & RAG
+    UI/UX & Explainability      :a9, 2026-03-23, 7d
+
+    section Connectivity
+    API & Agent Comms           :a10, 2026-03-30, 7d
+
+    section Testing
+    Unit & Integration          :a11, 2026-03-30, 14d
+
+    section Final Ops
+    Deployment & Final          :a12, 2026-04-13, 7d
+    Final Report & Code (30%)   :crit, milestone, m4, 2026-04-17, 0d

@@ -58,7 +58,6 @@ class PerformanceEvaluator:
         print("═" * 100)
 
     @staticmethod
-    @staticmethod
     def plot_results(df: pd.DataFrame, save_folder="reports/plots"):
         """
         Surgically updated to match the 'Sealed 24' result keys.

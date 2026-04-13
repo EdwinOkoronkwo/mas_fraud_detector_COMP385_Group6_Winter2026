@@ -2,21 +2,22 @@ import numpy as np
 
 
 class WeightAdapter:
-    def __init__(self, momentum=0.3):  # Increased momentum for more visible curve
+    def __init__(self, momentum=0.5):
         self.momentum = momentum
         self.agent_performance = {
-            # Low seeds (0.1) make the system react faster to early mistakes
-            "gold": {"tp": 0.1, "fp": 0, "fn": 0.1},
-            "neuro": {"tp": 0.1, "fp": 0, "fn": 0.1},
-            "cluster": {"tp": 0.1, "fp": 0, "fn": 0.1}
+            "gold": {"tp": 1.0, "fp": 0.01, "fn": 0.01},
+            "neuro": {"tp": 0.5, "fp": 0.5, "fn": 0.5},
+            "cluster": {"tp": 0.2, "fp": 0.8, "fn": 0.8}
         }
-        # Start everyone equal so we can watch them diverge
-        self.current_weights = {"gold": 0.33, "neuro": 0.33, "cluster": 0.34}
+        self.current_weights = {"gold": 0.70, "neuro": 0.20, "cluster": 0.10}
+
+    def get_weights(self):
+        """🚀 FIX: The method the BatchProcessor was looking for."""
+        return self.current_weights
 
     def update_performance(self, actual, gold_p, n_p, c_p, threshold=0.3):
-        """Updates internal stats based on whether agents were right or wrong."""
+        """Updates stats based on Ground Truth."""
         agents = {"gold": gold_p, "neuro": n_p, "cluster": c_p}
-
         for name, prob in agents.items():
             pred = 1 if prob >= threshold else 0
             if pred == 1 and actual == 1:
@@ -29,22 +30,17 @@ class WeightAdapter:
         self._recalculate_weights()
 
     def _recalculate_weights(self):
-        """Calculates new weights based on F1-Score of each agent."""
         scores = {}
         for name, stats in self.agent_performance.items():
             precision = stats["tp"] / (stats["tp"] + stats["fp"])
             recall = stats["tp"] / (stats["tp"] + stats["fn"])
-            # Calculate F1 as the trust metric
-            f1 = (2 * precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.1
-            scores[name] = f1
+            f1 = (2 * precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.01
+            scores[name] = f1 ** 2
 
-        # Normalize scores so they sum to 1.0
         total = sum(scores.values())
+        if total == 0: return  # Safety check
+
         new_weights = {k: (v / total) for k, v in scores.items()}
 
-        # Apply momentum (Smooth transition so weights don't jitter)
         for k in self.current_weights:
             self.current_weights[k] = (1 - self.momentum) * self.current_weights[k] + (self.momentum * new_weights[k])
-
-    def get_weights(self):
-        return self.current_weights

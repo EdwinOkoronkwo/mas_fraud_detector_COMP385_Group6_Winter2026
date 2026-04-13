@@ -1,0 +1,25 @@
+sequenceDiagram
+    participant O as Pipeline Orchestrator
+    participant DH as Data Handler
+    participant ST as Supervised Team
+    participant AT as Anomaly Team
+    participant AG as Decision Aggregator
+    participant REG as Champion Registry
+
+    O->>DH: Initialize Data Foundation
+    DH-->>O: SQL DB Ready & Scaled
+    
+    par Parallel Tournament
+        O->>ST: Start Supervised Training (XGB/RF)
+        ST-->>O: Return Model Metrics (AUC/Precision)
+    and
+        O->>AT: Start Anomaly Discovery (Clustering)
+        AT-->>O: Return Reconstruction Errors (MSE)
+    end
+
+    O->>AG: Request Best Model Selection
+    Note over AG: Aggregator ranks agents <br/>based on validation performance.
+    
+    AG->>REG: Save Inference Metadata (JSON)
+    Note right of REG: Persistence: Models exported <br/>and registry updated.
+    REG-->>O: Training Cycle Complete

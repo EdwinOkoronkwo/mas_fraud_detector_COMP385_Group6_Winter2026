@@ -2,11 +2,8 @@
 from typing import Any, List
 
 from autogen_agentchat.base import TaskResult
-from autogen_core.models import UserMessage
 
 from typing import Any, Callable  # Add this line
-
-from autogen_core.models import UserMessage
 
 from core.state import PipelineState
 from utils.logger import setup_logger

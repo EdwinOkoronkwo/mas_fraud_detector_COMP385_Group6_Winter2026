@@ -1,5 +1,6 @@
 import os
 import os
+import chromadb
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_community.document_loaders import TextLoader
@@ -11,14 +12,16 @@ class VectorService:
         self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
         self.persist_directory = persist_directory
 
-        # Ensure directory exists
         if not os.path.exists(persist_directory):
             os.makedirs(persist_directory)
 
+        # 🚀 FIX: Manually initialize the PersistentClient to force the tenant/database creation
+        self._client = chromadb.PersistentClient(path=self.persist_directory)
+
         self.vector_store = Chroma(
-            persist_directory=self.persist_directory,
+            client=self._client, # Pass the explicit client here
+            collection_name="fraud_policies",
             embedding_function=self.embeddings,
-            collection_name="fraud_policies"
         )
 
     def load_local_policies(self, file_path):

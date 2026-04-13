@@ -8,8 +8,8 @@ dependencies = [
     "autogen-agentchat",
     "autogen-core",
     "autogen-ext",
-    "pandas",            # Added for DataHandler and Pipeline loops
-    "numpy",             # Added for RMS math in LogicGatekeeper
+    "pandas", # Added for DataHandler and Pipeline loops
+    "numpy", # Added for RMS math in LogicGatekeeper
     "ipykernel",
     "python_dotenv",
     "tiktoken",
@@ -35,7 +35,9 @@ dependencies = [
     "langchain-openai",
     "chroma",
     "chromadb",
-    "tabulate"
+    "tabulate",
+    "pytest",
+    "pytest-asyncio",
 ]
 [tool.uv.extra-build-dependencies]
 ipython-cluster-helper = ["pip"]

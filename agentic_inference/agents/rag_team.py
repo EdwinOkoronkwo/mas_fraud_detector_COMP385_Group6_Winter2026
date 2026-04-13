@@ -1,13 +1,6 @@
 from autogen_agentchat.conditions import TextMentionTermination, MaxMessageTermination
 from autogen_agentchat.teams import SelectorGroupChat
 
-from autogen_agentchat.teams import SelectorGroupChat
-from autogen_agentchat.conditions import TextMentionTermination
-
-from agentic_inference.agents.sql_researcher import SQLResearcher
-from agentic_inference.agents.synthesis_engine import SynthesisEngine
-from agentic_inference.agents.vector_researcher import VectorResearcher
-
 
 class RagAuditTeam:
     def __init__(self, model_client, sql_agent, vector_agent, synth_agent):
@@ -19,22 +12,17 @@ class RagAuditTeam:
     def audit_selector(self, messages) -> str | None:
         if not messages: return "SQL_Researcher"
 
-        last_msg = messages[-1]
-        last_speaker = last_msg.source.lower()
+        last_speaker = messages[-1].source.lower()
 
-        # Step 1: SQL has found the record -> Pass to Vector for Policy search
+        # Step 1: SQL_Researcher has laid out the grounded facts -> Get Policy
         if "sql_researcher" in last_speaker:
             return "Vector_Researcher"
 
-        # Step 2: Vector has found the Policy -> Pass to Synthesis for final narrative
+        # Step 2: Vector has the policy -> Synthesize
         if "vector_researcher" in last_speaker:
             return "Synthesis_Engine"
 
-        # Step 3: Synthesis Engine provides the "Understanding" -> Exit
-        if "synthesis_engine" in last_speaker:
-            return None
-
-        return "SQL_Researcher"
+        return None  # End conversation
 
     def get_team(self):
         return SelectorGroupChat(

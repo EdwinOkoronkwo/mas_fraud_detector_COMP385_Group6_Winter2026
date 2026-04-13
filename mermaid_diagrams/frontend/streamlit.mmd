@@ -1,0 +1,25 @@
+graph TD
+    subgraph "Streamlit Frontend (The View)"
+        A[main.py Router] -->|Tab 1| B[BatchView]
+        A -->|Tab 2| C[SimulatorView]
+        A -->|Tab 3| D[CustomerView]
+
+        B --> E[MetricsComponent]
+        C --> F[Form/Auto-fill Logic]
+        D --> G[Registration/Directory]
+    end
+
+    subgraph "Session State (The Store)"
+        H[(st.session_state)]
+        H -.->|Persists| B
+        H -.->|Holds| P[InferencePipeline]
+    end
+
+    subgraph "The Controller"
+        I[InferenceController]
+    end
+
+    B & C --> I
+    D --> J[(SQLite: Customer Table)]
+    I --> J
+    I --> P

@@ -1,0 +1,16 @@
+sequenceDiagram
+    participant C as Controller
+    participant P as Planner Agent
+    participant W as Worker Agents (Neural/XGB)
+    participant R as RAG Agent
+    participant CR as Critic Agent (Final Auditor)
+
+    C->>P: Submit Transaction Data
+    P->>W: Fetch Numerical Risk Scores (MSE/Prob)
+    W-->>P: [0.056, 0.098]
+    P->>R: Fetch Category Policy Guidelines
+    R-->>P: Found RULE-PROBE-4837 (99% Risk)
+    
+    P->>CR: Synthesize Numeric + Narrative Data
+    Note over CR: Critic identifies conflict: Low Anomaly <br/>but high Policy Match.
+    CR-->>C: Returns High-Risk Verdict + Explanation

@@ -46,24 +46,49 @@ class InferencePipeline:
         self.base_pillar = BaselinePillar(self.infra.get_baseline_model_path(), self.mas_features)
 
     def _parse_agent_explanation(self, text: str) -> str:
-        # Added "BANKING OPERATIONAL POLICY.*?\d\)" to the removal pattern
+        # Use a non-greedy match for the JSON block to avoid over-cleansing
         clean_text = re.sub(
-            r"BANKING OPERATIONAL POLICY.*?RULE-[\w-]+:\s*|CASE_CLOSED|```json|```|\{.*\}",
+            r"(--- )?BANKING OPERATIONAL POLICY.*?RULE-[\w-]+:.*?(\.|\n)|CASE_CLOSED|```json.*?```|```.*?```|\{.*?\}",
             "",
             text,
             flags=re.IGNORECASE | re.DOTALL
         ).strip()
 
-        # Remove any lingering double spaces or leading dashes
         clean_text = re.sub(r"^\W+", "", clean_text)
         return clean_text if len(clean_text) >= 5 else "Neural Math complete."
 
-    async def run_batch(self, n_samples: int = 100):
-        """Delegates the heavy lifting to the BatchProcessor."""
-        processor = BatchProcessor(self)
-        final_df = await processor.execute(n_samples)
+    # def _parse_agent_explanation(self, text: str) -> str:
+    #     """
+    #     Cleans the agent's raw output to extract the narrative explanation.
+    #     """
+    #     # Improved regex to handle banking policy blocks and metadata cleanup
+    #     clean_text = re.sub(
+    #         r"(--- )?BANKING OPERATIONAL POLICY.*?RULE-[\w-]+:.*?(\.|\n)|CASE_CLOSED|```json|```|\{.*\}",
+    #         "",
+    #         text,
+    #         flags=re.IGNORECASE | re.DOTALL
+    #     ).strip()
+    #
+    #     # Remove lingering formatting characters or leading dashes
+    #     clean_text = re.sub(r"^\W+", "", clean_text)
+    #
+    #     # Fallback if cleaning removed too much text
+    #     return clean_text if len(clean_text) >= 5 else "Neural Math complete. Transaction validated against database."
 
-        # Sync weight history back to pipeline so main() can find it for evaluator
+    async def run_batch(self, n_samples: int = 100, params: dict = None, manual_df=None, callback=None):
+        """
+        Standardized Router: Passes the callback and initiates the re-hydrated audit process.
+        """
+        processor = BatchProcessor(self)
+
+        if manual_df is not None:
+            # Executes the 'Single View' logic
+            final_df = await processor.execute_manual(manual_df, params=params, callback=callback)
+        else:
+            # Executes the re-hydrated batch logic we fixed (Jeffrey proof)
+            final_df = await processor.execute(n_samples, params=params, callback=callback)
+
+        # Sync weight history back to pipeline for UI visualizations
         self.last_weight_history = processor.weight_history
         return final_df
 

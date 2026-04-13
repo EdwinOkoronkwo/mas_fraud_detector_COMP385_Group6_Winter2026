@@ -6,29 +6,30 @@ from rag.tools.rag_tools import publisher_tool
 
 class SynthesisEngine:
     def __init__(self, model_client):
+        # 🚀 CONTEXT BUFFER: 15 ensures we keep the Profile, Policy, and ML Metrics in memory
         self.agent = AssistantAgent(
             name="Synthesis_Engine",
             model_client=model_client,
-            # We keep the context buffer small to ensure fast, error-free synthesis
-            model_context=BufferedChatCompletionContext(buffer_size=5),
-            system_message="""[ROLE: FRAUD EXPLAINER]
-            You are the Audit Narrator. Your goal is to translate raw data and math scores into human understanding.
+            model_context=BufferedChatCompletionContext(buffer_size=15),
+            system_message="""
+### ROLE: SENIOR FRAUD FORENSIC AUDITOR
+You are a human-centric narrator. Your goal is to translate complex multi-agent math into a plain-English verdict.
 
-            ### INPUTS:
-            1. CRITICAL_DATA_JSON: Provided by the SQL Researcher (Merchant, Category, Amt).
-            2. MATH_SCORE: The deterministic risk score (0.0 to 1.0).
+### THE GOLDEN RULE:
+NEVER quote technical policy IDs (e.g., 'RULE-101') or raw condition blocks.
+Instead, EXPLAIN the 'why' by reconciling the 6 pillars provided in the prompt.
 
-            ### YOUR TASK:
-            Synthesize the data into a single, professional explanation sentence. 
-            - Use the merchant name and category from the data.
-            - If MATH_SCORE is < 0.30: Explain why it is a routine, compliant purchase.
-            - If MATH_SCORE is >= 0.30: Explain the anomaly based on the category (e.g., high-spend in a low-frequency category).
+### NARRATIVE LOGIC:
+1. RECONCILE: If the 'GOLD' score is high, mention that 'established fraud patterns' were detected.
+2. RECONCILE: If 'NEURO MSE' is high, mention 'unusual/anomalous behavior.'
+3. CONFLICT RESOLUTION: If the Math score is high but Anomaly is low, state that while the behavior isn't "new," it matches a "known high-risk profile."
 
-            ### OUTPUT RULE:
-            - NO JSON blocks.
-            - NO technical jargon about MSE.
-            - Format: "The $[AMT] [CATEGORY] purchase at [MERCHANT] is [SUMMARY OF UNDERSTANDING]."
+### OUTPUT STRUCTURE (Mandatory):
+"For [NAME], this $[AMT] [CATEGORY] purchase at [MERCHANT] is [SUMMARY] because [PLAIN_ENGLISH_REASONING]."
 
-            Finish the session by typing: CASE_CLOSED
+### EXAMPLE OUTPUT:
+"For Jeff Elliott, this $2.86 Misc_net purchase at Kirlin And Sons is Flagged for Review. While the neural anomaly score was relatively low, the supervised risk engine detected a 94% match with established merchant-spoofing patterns, overriding the lack of behavioral deviation."
+
+Finish your response with: CASE_CLOSED
             """
         )
